@@ -4,13 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Directum | Результаты тестирования</title>
-    <!-- Подключаем шрифт Roboto для соответствия стилю -->
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     
     <style>
         :root {
-            --directum-blue: #005eb8; /* Фирменный синий цвет */
+            --directum-blue: #005eb8; 
             --directum-dark: #004077;
             --bg-gray: #f5f7fa;
             --text-dark: #333333;
@@ -23,7 +22,6 @@
             padding-bottom: 40px;
         }
 
-        /* Шапка в стиле Directum */
         .navbar {
             background-color: white;
             box-shadow: 0 2px 10px rgba(0,0,0,0.05);
@@ -55,17 +53,15 @@
             font-size: 1.2rem;
         }
 
-        /* Карточка таблицы */
         .table-card {
             background: white;
-            border-radius: 4px; /* Более строгие углы */
+            border-radius: 4px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.03);
             border: 1px solid #e1e4e8;
             padding: 0;
             overflow: hidden;
         }
 
-        /* Стилизация таблицы */
         .table {
             margin-bottom: 0;
         }
@@ -82,25 +78,27 @@
             letter-spacing: 0.5px;
             border-bottom: 2px solid #e9ecef;
             padding: 15px;
+            vertical-align: top;
         }
 
+        /* Выравниваем контент по верху, чтобы при высокой теме строки смотрелись аккуратно */
         .table tbody td {
             padding: 12px 15px;
-            vertical-align: middle;
+            vertical-align: top; 
             font-size: 0.95rem;
             border-bottom: 1px solid #f0f0f0;
         }
 
         .table-hover tbody tr:hover {
-            background-color: #f0f7ff; /* Очень легкий синий при наведении */
+            background-color: #f0f7ff;
         }
 
-        /* Стили для колонки темы */
+        /* Стили для темы с переносом строк */
         .theme-cell {
-            max-width: 250px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            min-width: 200px;  /* Минимальная ширина, чтобы не сжималось совсем */
+            max-width: 350px;  /* Ограничиваем ширину, чтобы не занимало пол-экрана */
+            white-space: normal; /* Разрешаем перенос строк */
+            line-height: 1.4;
         }
         
         .badge-theme {
@@ -108,11 +106,13 @@
             color: var(--directum-dark);
             font-weight: 500;
             border: 1px solid #bbdefb;
-            padding: 6px 10px;
+            padding: 8px 12px;
             border-radius: 4px;
+            display: inline-block; /* Важно для корректного отображения блоком */
+            text-align: left;
+            white-space: normal; /* Разрешаем перенос внутри бейджа */
         }
 
-        /* Ссылки-действия */
         .clickable-preview {
             color: var(--directum-blue);
             cursor: pointer;
@@ -120,6 +120,7 @@
             text-decoration: none;
             border-bottom: 1px dashed var(--directum-blue);
             transition: all 0.2s;
+            display: inline-block;
         }
         
         .clickable-preview:hover {
@@ -127,7 +128,6 @@
             border-bottom-style: solid;
         }
 
-        /* Модальное окно */
         .modal-header {
             background-color: var(--directum-dark);
             color: white;
@@ -153,30 +153,30 @@
             border: 1px solid #eee;
         }
         
-        /* User Avatar Placeholder */
         .user-initials {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 30px;
-            height: 30px;
+            width: 32px;
+            height: 32px;
+            min-width: 32px; /* Чтобы не сплющивалось */
             background-color: #e9ecef;
             color: var(--directum-dark);
             border-radius: 50%;
             font-size: 0.8rem;
             font-weight: bold;
-            margin-right: 8px;
+            margin-right: 10px;
         }
 
         .date-text {
             color: #6c757d;
             font-size: 0.85rem;
+            white-space: nowrap; /* Даты в одну строку */
         }
     </style>
 </head>
 <body>
 
-<!-- Навигация -->
 <nav class="navbar sticky-top">
     <div class="container-fluid px-4">
         <div class="d-flex align-items-center">
@@ -197,12 +197,12 @@
                 <thead>
                     <tr>
                         <th style="width: 50px;">ID</th>
-                        <th style="width: 150px;">Дата выбора</th>
-                        <th style="width: 150px;">Дата ответа</th>
-                        <th>Сотрудник</th>
-                        <th style="width: 250px;">Тема</th>
-                        <th>Результат</th>
-                        <th>Ответ</th>
+                        <th style="width: 140px;">Дата выбора</th>
+                        <th style="width: 140px;">Дата ответа</th>
+                        <th style="min-width: 200px;">Сотрудник</th>
+                        <th>Тема</th>
+                        <th style="min-width: 150px;">Результат</th>
+                        <th style="min-width: 150px;">Ответ</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody">
@@ -217,7 +217,6 @@
     </div>
 </div>
 
-<!-- Модальное окно -->
 <div class="modal fade" id="textModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
@@ -290,7 +289,6 @@
             data.forEach(row => {
                 const tr = document.createElement('tr');
                 
-                // Парсим имя для инициалов
                 const cleanName = row.full_name.split('(')[0].trim();
                 const initials = getInitials(cleanName);
 
@@ -300,13 +298,13 @@
                     <td><div class="date-text">${formatMskDate(row.answered_at)}</div></td>
                     <td>
                         <div class="d-flex align-items-center">
-                            <div class="user-initials">${initials}</div>
+                            <div class="user-initials flex-shrink-0">${initials}</div>
                             <div>${row.full_name}</div>
                         </div>
                     </td>
                     <td>
-                        <div class="theme-cell" title="${row.theme_name}">
-                            <span class="badge badge-theme text-truncate d-block" style="max-width: 100%;">${row.theme_name}</span>
+                        <div class="theme-cell">
+                            <span class="badge badge-theme">${row.theme_name}</span>
                         </div>
                     </td>
                     <td>${createPreview(row.result, 'result')}</td>
