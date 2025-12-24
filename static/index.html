@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Результаты тестирования</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; padding: 20px; }
+        .table-container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .clickable-preview { color: #0d6efd; cursor: pointer; text-decoration: underline; }
+        .clickable-preview:hover { color: #0a58ca; }
+        /* Сохраняем форматирование текста в модальном окне */
+        #modalContent { white-space: pre-wrap; font-family: monospace; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+
+<div class="container-fluid">
+    <h2 class="mb-4">Результаты тестирования (ID >= 45)</h2>
+    
+    <div class="table-container">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle" id="resultsTable">
+                <thead class="table-light">
+                    <tr>
+                        <th>ID</th>
+                        <th>Дата выбора темы</th>
+                        <th>Дата ответа</th>
+                        <th>ФИО (username)</th>
+                        <th>Тема</th>
+                        <th>Результат</th>
+                        <th>Ответ пользователя</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    <tr><td colspan="7" class="text-center">Загрузка данных...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно для просмотра полного текста -->
+<div class="modal fade" id="textModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalTitle">Просмотр</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="modalContent"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // Функция форматирования даты в МСК (UTC+3)
+    function formatMskDate(dateString) {
+        if (!dateString) return "-";
+        const date = new Date(dateString);
+        return date.toLocaleString("ru-RU", {
+            timeZone: "Europe/Moscow",
+            day: "2-digit", month: "2-digit", year: "numeric",
+            hour: "2-digit", minute: "2-digit"
+        });
+    }
+
+    // Функция создания превью текста
+    function createPreview(text, type) {
+        if (!text) return "-";
+        
+        // Попытка найти оценку, если это Результат
+        let previewText = text.slice(0, 50) + "...";
+        if (type === 'result') {
+            const match = text.match(/Итоговая оценка:\s*\d+/i);
+            if (match) {
+                previewText = match[0]; // Берем "Итоговая оценка: X"
+            }
+        } else {
+             // Для ответа пользователя берем просто начало
+             previewText = text.slice(0, 40) + (text.length > 40 ? "..." : "");
+        }
+
+        return `<span class="clickable-preview" onclick="openModal('${type}', this)">${previewText}</span>
+                <div class="full-text d-none">${text // Скрытый полный текст для доступа из JS
+                    .replace(/"/g, '&quot;')
+                    }</div>`;
+    }
+
+    // Открытие модалки
+    function openModal(type, element) {
+        const fullTextDiv = element.nextElementSibling;
+        const fullText = fullTextDiv.innerHTML
+            .replace(/&quot;/g, '"')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>'); // Декодируем обратно
+            
+        const title = type === 'result' ? 'Полный результат анализа' : 'Ответ пользователя';
+        
+        document.getElementById('modalTitle').textContent = title;
+        document.getElementById('modalContent').textContent = fullText;
+        
+        const modal = new bootstrap.Modal(document.getElementById('textModal'));
+        modal.show();
+    }
+
+    async function loadData() {
+        try {
+            const response = await fetch('/api/data');
+            const data = await response.json();
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            data.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${row.id}</td>
+                    <td>${formatMskDate(row.created_at)}</td>
+                    <td>${formatMskDate(row.answered_at)}</td>
+                    <td><strong>${row.full_name}</strong></td>
+                    <td><span class="badge bg-secondary">${row.theme_name}</span></td>
+                    <td>${createPreview(row.result, 'result')}</td>
+                    <td>${createPreview(row.user_answer, 'answer')}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (e) {
+            console.error(e);
+            document.getElementById('tableBody').innerHTML = '<tr><td colspan="7" class="text-danger text-center">Ошибка загрузки данных</td></tr>';
+        }
+    }
+
+    // Загружаем данные при старте
+    loadData();
+</script>
+</body>
+</html>
