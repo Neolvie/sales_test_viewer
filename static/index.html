@@ -265,6 +265,20 @@
         if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
         return fullName.slice(0, 2).toUpperCase();
     }
+	
+	function formatUserWithLink(fullName) {
+        // Регулярка ищет формат "Имя Фамилия (username)"
+        const match = fullName.match(/^(.*?)\s*\((.*?)\)$/);
+
+        // Если нашли username и он не равен заглушке
+        if (match && match[2] && match[2] !== 'no_user') {
+            const name = match[1];
+            const username = match[2];
+            // Формируем ссылку. Стили inline, чтобы не лезть в CSS
+            return `${name} (<a href="https://t.me/${username}" target="_blank" title="Открыть Telegram" style="color: var(--directum-blue); text-decoration: none; border-bottom: 1px dotted var(--directum-blue);">${username}</a>)`;
+        }
+        return fullName; // Если никнейма нет, возвращаем как было
+    }
 
     function openModal(type, element) {
         const fullTextDiv = element.nextElementSibling;
@@ -299,7 +313,7 @@
                     <td>
                         <div class="d-flex align-items-center">
                             <div class="user-initials flex-shrink-0">${initials}</div>
-                            <div>${row.full_name}</div>
+                            <div>${formatUserWithLink(row.full_name)}</div>
                         </div>
                     </td>
                     <td>
