@@ -53,6 +53,21 @@
             font-size: 1.2rem;
         }
 
+        .main-layout {
+            display: flex;
+            gap: 20px;
+        }
+
+        .main-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .sidebar {
+            width: 320px;
+            flex-shrink: 0;
+        }
+
         .table-card {
             background: white;
             border-radius: 4px;
@@ -81,7 +96,6 @@
             vertical-align: top;
         }
 
-        /* Выравниваем контент по верху, чтобы при высокой теме строки смотрелись аккуратно */
         .table tbody td {
             padding: 12px 15px;
             vertical-align: top; 
@@ -93,11 +107,10 @@
             background-color: #f0f7ff;
         }
 
-        /* Стили для темы с переносом строк */
         .theme-cell {
-            min-width: 200px;  /* Минимальная ширина, чтобы не сжималось совсем */
-            max-width: 350px;  /* Ограничиваем ширину, чтобы не занимало пол-экрана */
-            white-space: normal; /* Разрешаем перенос строк */
+            min-width: 200px;
+            max-width: 350px;
+            white-space: normal;
             line-height: 1.4;
         }
         
@@ -108,9 +121,21 @@
             border: 1px solid #bbdefb;
             padding: 8px 12px;
             border-radius: 4px;
-            display: inline-block; /* Важно для корректного отображения блоком */
+            display: inline-block;
             text-align: left;
-            white-space: normal; /* Разрешаем перенос внутри бейджа */
+            white-space: normal;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .badge-theme:hover {
+            background-color: #bbdefb;
+        }
+        
+        .badge-theme.active {
+            background-color: var(--directum-blue);
+            color: white;
+            border-color: var(--directum-dark);
         }
 
         .clickable-preview {
@@ -159,7 +184,7 @@
             justify-content: center;
             width: 32px;
             height: 32px;
-            min-width: 32px; /* Чтобы не сплющивалось */
+            min-width: 32px;
             background-color: #e9ecef;
             color: var(--directum-dark);
             border-radius: 50%;
@@ -171,7 +196,106 @@
         .date-text {
             color: #6c757d;
             font-size: 0.85rem;
-            white-space: nowrap; /* Даты в одну строку */
+            white-space: nowrap;
+        }
+
+        .sidebar-card {
+            background: white;
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+            border: 1px solid #e1e4e8;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .sidebar-card h5 {
+            color: var(--directum-dark);
+            font-weight: 600;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .selected-count {
+            background: var(--directum-blue);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+        }
+
+        .loading-more {
+            text-align: center;
+            padding: 20px;
+            color: #6c757d;
+        }
+
+        .checkbox-column {
+            width: 50px;
+            text-align: center;
+        }
+
+        .filter-section {
+            margin-bottom: 15px;
+        }
+
+        .filter-section label {
+            font-weight: 500;
+            color: var(--directum-dark);
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .btn-settings {
+            background: none;
+            border: none;
+            color: var(--directum-dark);
+            cursor: pointer;
+            font-size: 1.2rem;
+            padding: 5px;
+            transition: color 0.2s;
+        }
+
+        .btn-settings:hover {
+            color: var(--directum-blue);
+        }
+
+        #analysisResult {
+            white-space: pre-wrap;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9rem;
+            background-color: #fafafa;
+            padding: 15px;
+            border-radius: 4px;
+            border: 1px solid #eee;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .streaming-indicator {
+            color: var(--directum-blue);
+            font-style: italic;
+        }
+        
+        .theme-filter-list {
+            max-height: 350px;
+            overflow-y: auto;
+            border: 1px solid #e1e4e8;
+            border-radius: 4px;
+            padding: 10px;
+        }
+        
+        .theme-filter-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 0;
+            cursor: pointer;
+        }
+        
+        .theme-filter-item:hover {
+            background-color: #f5f7fa;
         }
     </style>
 </head>
@@ -191,24 +315,77 @@
 </nav>
 
 <div class="container-fluid px-4">
-    <div class="table-card">
-        <div class="table-responsive">
-            <table class="table table-hover" id="resultsTable">
-                <thead>
-                    <tr>
-                        <th style="width: 50px;">ID</th>
-                        <th style="width: 140px;">Дата выбора</th>
-                        <th style="width: 140px;">Дата ответа</th>
-                        <th style="min-width: 200px;">Сотрудник</th>
-                        <th>Тема</th>
-                        <th style="min-width: 150px;">Результат</th>
-                        <th style="min-width: 150px;">Ответ</th>
-                    </tr>
-                </thead>
-                <tbody id="tableBody">
-                    <tr><td colspan="7" class="text-center py-5 text-muted">Загрузка данных...</td></tr>
-                </tbody>
-            </table>
+    <div class="main-layout">
+        <!-- Основной контент с таблицей -->
+        <div class="main-content">
+            <div class="table-card">
+                <div class="table-responsive">
+                    <table class="table table-hover" id="resultsTable">
+                        <thead>
+                            <tr>
+                                <th class="checkbox-column">✓</th>
+                                <th style="width: 50px;">ID</th>
+                                <th style="width: 140px;">Дата выбора</th>
+                                <th style="width: 140px;">Дата ответа</th>
+                                <th style="min-width: 200px;">Сотрудник</th>
+                                <th>Тема</th>
+                                <th style="min-width: 170px;">Результат</th>
+                                <th style="min-width: 130px;">Ответ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <tr><td colspan="8" class="text-center py-5 text-muted">Загрузка данных...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="loading-more d-none" id="loadingMore">
+                Загрузка ещё данных...
+            </div>
+        </div>
+
+        <!-- Боковая панель -->
+        <div class="sidebar">
+            <div class="sidebar-card">
+                <h5>
+                    Анализ
+                    <button class="btn-settings" onclick="openSettingsModal()" title="Настройки промта">⚙️</button>
+                </h5>
+                
+                <div class="mb-3">
+                    <span class="selected-count" id="selectedCount">0 выбрано</span>
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <button class="btn btn-primary btn-sm" id="analyzeBtn" onclick="analyzeAnswers()" disabled>
+                        🚀 Запустить анализ
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="clearSelection()">
+                        Сбросить выбор
+                    </button>
+                </div>
+            </div>
+
+            <div class="sidebar-card">
+                <h5>Фильтр по темам</h5>
+                <div class="theme-filter-list" id="themeFilterList">
+                    <div class="text-muted small">Загрузка тем...</div>
+                </div>
+                <button class="btn btn-outline-secondary btn-sm w-100 mt-2" onclick="clearThemeFilter()">
+                    Сбросить фильтр
+                </button>
+            </div>
+
+            <div class="sidebar-card">
+                <h5>Фильтр по оценке</h5>
+                <div class="theme-filter-list" id="scoreFilterList">
+                    <div class="text-muted small">Загрузка оценок...</div>
+                </div>
+                <button class="btn btn-outline-secondary btn-sm w-100 mt-2" onclick="clearScoreFilter()">
+                    Сбросить фильтр
+                </button>
+            </div>
         </div>
     </div>
     
@@ -217,6 +394,7 @@
     </div>
 </div>
 
+<!-- Модальное окно для просмотра текста -->
 <div class="modal fade" id="textModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
@@ -234,8 +412,84 @@
   </div>
 </div>
 
+<!-- Модальное окно настроек промта -->
+<div class="modal fade" id="settingsModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Настройки анализа</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+            <label for="analysisPrompt" class="form-label fw-bold">Промт для анализа:</label>
+            <textarea class="form-control" id="analysisPrompt" rows="5">проанализируй и обобщи наиболее явные ошибки и дай рекомендации. Игнорируй непоследовательность и некорректность в названии и терминах, т.к. это может быть связано с некорректным распознаванием записи.</textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Закрыть</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="saveSettings()">Сохранить</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Модальное окно результата анализа -->
+<div class="modal fade" id="resultModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Результат анализа</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="analysisResult"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="downloadResult()">
+            💾 Скачать .md
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Закрыть</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+    // Состояние пагинации
+    let currentOffset = 0;
+    const defaultLimit = 20;
+    let currentLimit = parseInt(localStorage.getItem('salesViewer_pageSize')) || defaultLimit;
+    let isLoading = false;
+    let hasMore = true;
+    let totalRecords = 0;
+
+    // Выбранные ответы для анализа
+    let selectedAnswers = new Map();
+    
+    // Все доступные темы
+    let allThemes = [];
+    let activeThemeFilter = null;
+    
+    // Все доступные оценки
+    let allScores = [];
+    let activeScoreFilter = null;
+    
+    // Данные таблицы (для фильтрации)
+    let allTableData = [];
+
+    // Загрузка промта из localStorage
+    function loadPrompt() {
+        const saved = localStorage.getItem('salesViewer_analysisPrompt');
+        return saved || 'проанализируй и обобщи наиболее явные ошибки и дай рекомендации. Игнорируй непоследовательность и некорректность в названии и терминах, т.к. это может быть связано с некорректным распознаванием записи.';
+    }
+    
+    function savePrompt() {
+        const prompt = document.getElementById('analysisPrompt').value;
+        localStorage.setItem('salesViewer_analysisPrompt', prompt);
+    }
+
     function formatMskDate(dateString) {
         if (!dateString) return "-";
         const date = new Date(dateString);
@@ -267,17 +521,13 @@
     }
 	
 	function formatUserWithLink(fullName) {
-        // Регулярка ищет формат "Имя Фамилия (username)"
         const match = fullName.match(/^(.*?)\s*\((.*?)\)$/);
-
-        // Если нашли username и он не равен заглушке
         if (match && match[2] && match[2] !== 'no_user') {
             const name = match[1];
             const username = match[2];
-            // Формируем ссылку. Стили inline, чтобы не лезть в CSS
             return `${name} (<a href="https://t.me/${username}" target="_blank" title="Открыть Telegram" style="color: var(--directum-blue); text-decoration: none; border-bottom: 1px dotted var(--directum-blue);">${username}</a>)`;
         }
-        return fullName; // Если никнейма нет, возвращаем как было
+        return fullName;
     }
 
     function openModal(type, element) {
@@ -293,46 +543,373 @@
         modal.show();
     }
 
-    async function loadData() {
+    function openSettingsModal() {
+        document.getElementById('analysisPrompt').value = loadPrompt();
+        const modal = new bootstrap.Modal(document.getElementById('settingsModal'));
+        modal.show();
+    }
+    
+    function saveSettings() {
+        savePrompt();
+        const modal = bootstrap.Modal.getInstance(document.getElementById('settingsModal'));
+        modal.hide();
+    }
+
+    function updateSelectedCount() {
+        document.getElementById('selectedCount').textContent = `${selectedAnswers.size} выбрано`;
+        document.getElementById('analyzeBtn').disabled = selectedAnswers.size === 0;
+    }
+
+    function toggleSelection(id) {
+        if (selectedAnswers.has(id)) {
+            selectedAnswers.delete(id);
+        } else {
+            const row = allTableData.find(r => r.id === id);
+            if (row) {
+                selectedAnswers.set(id, row);
+            }
+        }
+        updateSelectedCount();
+    }
+
+    function clearSelection() {
+        selectedAnswers.clear();
+        document.querySelectorAll('.answer-checkbox').forEach(cb => cb.checked = false);
+        updateSelectedCount();
+    }
+
+    // Извлечение оценки из текста результата
+    function extractScore(resultText) {
+        if (!resultText) return null;
+        const match = resultText.match(/Итоговая оценка:\s*(\d+)/i);
+        return match ? parseInt(match[1]) : null;
+    }
+    
+    // Фильтрация тем
+    function extractUniqueThemes(data) {
+        const themesMap = new Map();
+        data.forEach(row => {
+            if (row.theme_name && !themesMap.has(row.theme_name)) {
+                themesMap.set(row.theme_name, row.theme_name);
+            }
+        });
+        return Array.from(themesMap.values()).sort();
+    }
+    
+    // Фильтрация оценок
+    function extractUniqueScores(data) {
+        const scoresSet = new Set();
+        data.forEach(row => {
+            const score = extractScore(row.result);
+            if (score !== null) {
+                scoresSet.add(score);
+            }
+        });
+        return Array.from(scoresSet).sort((a, b) => a - b);
+    }
+    
+    function renderThemeFilter(themes) {
+        const container = document.getElementById('themeFilterList');
+        container.innerHTML = themes.map(theme => {
+            const isActive = activeThemeFilter === theme ? 'active' : '';
+            return `
+                <label class="theme-filter-item">
+                    <input type="checkbox" value="${theme}" 
+                           ${activeThemeFilter === theme ? 'checked' : ''}
+                           onchange="setThemeFilter('${theme}')">
+                    <span class="badge badge-theme ${isActive}">${theme}</span>
+                </label>
+            `;
+        }).join('');
+    }
+    
+    function renderScoreFilter(scores) {
+        const container = document.getElementById('scoreFilterList');
+        container.innerHTML = scores.map(score => {
+            const isActive = activeScoreFilter === score;
+            return `
+                <label class="theme-filter-item">
+                    <input type="checkbox" value="${score}" 
+                           ${isActive ? 'checked' : ''}
+                           onchange="setScoreFilter(${score})">
+                    <span class="badge badge-theme ${isActive ? 'active' : ''}">${score}</span>
+                </label>
+            `;
+        }).join('');
+    }
+    
+    async function setThemeFilter(theme) {
+        if (activeThemeFilter === theme) {
+            activeThemeFilter = null;
+        } else {
+            activeThemeFilter = theme;
+        }
+        
+        // Если включили фильтр — подгружаем все данные для корректной фильтрации
+        if (activeThemeFilter) {
+            currentOffset = 0;
+            hasMore = true;
+            allTableData = [];
+            document.getElementById('tableBody').innerHTML = '<tr><td colspan="8" class="text-center py-5 text-muted">Применение фильтра...</td></tr>';
+            
+            // Подгружаем все данные порциями
+            while (hasMore) {
+                await loadData(true, false);
+            }
+            allScores = extractUniqueScores(allTableData);
+            renderThemeFilter(allThemes);
+            renderScoreFilter(allScores);
+            renderTable();
+        } else {
+            // Сброс фильтра — полная перезагрузка
+            currentOffset = 0;
+            hasMore = true;
+            allTableData = [];
+            document.getElementById('tableBody').innerHTML = '<tr><td colspan="8" class="text-center py-5 text-muted">Загрузка данных...</td></tr>';
+            await loadData(false, true);
+        }
+    }
+    
+    async function clearThemeFilter() {
+        activeThemeFilter = null;
+        currentOffset = 0;
+        hasMore = true;
+        allTableData = [];
+        document.getElementById('tableBody').innerHTML = '<tr><td colspan="8" class="text-center py-5 text-muted">Загрузка данных...</td></tr>';
+        await loadData(false, true);
+    }
+    
+    async function setScoreFilter(score) {
+        if (activeScoreFilter === score) {
+            activeScoreFilter = null;
+        } else {
+            activeScoreFilter = score;
+        }
+        renderScoreFilter(allScores);
+        renderTable();
+    }
+    
+    function clearScoreFilter() {
+        activeScoreFilter = null;
+        renderScoreFilter(allScores);
+        renderTable();
+    }
+
+    // Фильтрация данных
+    function getFilteredData() {
+        let filtered = allTableData;
+        
+        if (activeThemeFilter) {
+            filtered = filtered.filter(row => row.theme_name === activeThemeFilter);
+        }
+        
+        if (activeScoreFilter !== null) {
+            filtered = filtered.filter(row => extractScore(row.result) === activeScoreFilter);
+        }
+        
+        return filtered;
+    }
+
+    // Рендер таблицы из отфильтрованных данных
+    function renderTable() {
+        const tbody = document.getElementById('tableBody');
+        tbody.innerHTML = '';
+        
+        const filteredData = getFilteredData();
+        
+        if (filteredData.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center py-5 text-muted">Нет данных по выбранному фильтру</td></tr>';
+            return;
+        }
+
+        filteredData.forEach(row => {
+            const tr = document.createElement('tr');
+            tr.dataset.id = row.id;
+            
+            const cleanName = row.full_name.split('(')[0].trim();
+            const initials = getInitials(cleanName);
+            const isSelected = selectedAnswers.has(row.id);
+
+            tr.innerHTML = `
+                <td class="checkbox-column">
+                    <input type="checkbox" class="form-check-input answer-checkbox" 
+                           ${isSelected ? 'checked' : ''} 
+                           onchange="toggleSelection(${row.id})">
+                </td>
+                <td class="text-muted small">${row.id}</td>
+                <td><div class="date-text">${formatMskDate(row.created_at)}</div></td>
+                <td><div class="date-text">${formatMskDate(row.answered_at)}</div></td>
+                <td>
+                    <div class="d-flex align-items-center">
+                        <div class="user-initials flex-shrink-0">${initials}</div>
+                        <div>${formatUserWithLink(row.full_name)}</div>
+                    </div>
+                </td>
+                <td>
+                    <div class="theme-cell">
+                        <span class="badge badge-theme">${row.theme_name}</span>
+                    </div>
+                </td>
+                <td>${createPreview(row.result, 'result')}</td>
+                <td>${createPreview(row.user_answer, 'answer')}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    async function loadData(append = false, render = true) {
+        if (isLoading || !hasMore) return;
+        
+        isLoading = true;
+
         try {
-            const response = await fetch('/api/data');
-            const data = await response.json();
-            const tbody = document.getElementById('tableBody');
-            tbody.innerHTML = '';
+            const response = await fetch(`/api/data?offset=${currentOffset}&limit=${currentLimit}`);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            const result = await response.json();
+            
+            if (!append) {
+                allTableData = [];
+                currentOffset = 0;
+            }
 
-            data.forEach(row => {
-                const tr = document.createElement('tr');
-                
-                const cleanName = row.full_name.split('(')[0].trim();
-                const initials = getInitials(cleanName);
-
-                tr.innerHTML = `
-                    <td class="text-muted small">${row.id}</td>
-                    <td><div class="date-text">${formatMskDate(row.created_at)}</div></td>
-                    <td><div class="date-text">${formatMskDate(row.answered_at)}</div></td>
-                    <td>
-                        <div class="d-flex align-items-center">
-                            <div class="user-initials flex-shrink-0">${initials}</div>
-                            <div>${formatUserWithLink(row.full_name)}</div>
-                        </div>
-                    </td>
-                    <td>
-                        <div class="theme-cell">
-                            <span class="badge badge-theme">${row.theme_name}</span>
-                        </div>
-                    </td>
-                    <td>${createPreview(row.result, 'result')}</td>
-                    <td>${createPreview(row.user_answer, 'answer')}</td>
-                `;
-                tbody.appendChild(tr);
+            totalRecords = result.total;
+            
+            // Добавляем новые данные
+            result.data.forEach(row => {
+                // Проверяем, нет ли уже такого ID
+                if (!allTableData.find(r => r.id === row.id)) {
+                    allTableData.push(row);
+                }
             });
+            
+            // Извлекаем уникальные темы и оценки при первой загрузке
+            if (!append) {
+                allThemes = extractUniqueThemes(allTableData);
+                allScores = extractUniqueScores(allTableData);
+                renderThemeFilter(allThemes);
+                renderScoreFilter(allScores);
+            }
+
+            // Рендерим таблицу с учётом фильтра (если нужно)
+            if (render) {
+                renderTable();
+            }
+
+            currentOffset += currentLimit;
+            hasMore = currentOffset < totalRecords;
+            
+            if (hasMore) {
+                document.getElementById('loadingMore').classList.remove('d-none');
+            } else {
+                document.getElementById('loadingMore').classList.add('d-none');
+            }
+
         } catch (e) {
-            console.error(e);
-            document.getElementById('tableBody').innerHTML = '<tr><td colspan="7" class="text-danger text-center py-4">Не удалось загрузить данные. Проверьте соединение.</td></tr>';
+            console.error('Load error:', e);
+            if (!append) {
+                document.getElementById('tableBody').innerHTML = '<tr><td colspan="8" class="text-danger text-center py-4">Не удалось загрузить данные. Проверьте соединение.</td></tr>';
+            }
+        } finally {
+            isLoading = false;
         }
     }
 
-    loadData();
+    // Бесконечная прокрутка
+    window.addEventListener('scroll', () => {
+        if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 500) {
+            loadData(true);
+        }
+    });
+
+    // Глобальная переменная для последнего результата анализа
+    let lastAnalysisResult = '';
+
+    async function analyzeAnswers() {
+        const answers = Array.from(selectedAnswers.values());
+        const prompt = loadPrompt();
+        
+        if (!answers.length) {
+            alert('Выберите хотя бы один ответ для анализа');
+            return;
+        }
+
+        const btn = document.getElementById('analyzeBtn');
+        const resultModal = new bootstrap.Modal(document.getElementById('resultModal'));
+        const resultDiv = document.getElementById('analysisResult');
+        
+        btn.disabled = true;
+        btn.textContent = '⏳ Анализ...';
+        
+        // Открываем модальное окно с индикатором загрузки
+        resultDiv.innerHTML = '<div class="text-center"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">Генерирую анализ...</p></div>';
+        resultModal.show();
+        lastAnalysisResult = '';
+
+        try {
+            const response = await fetch('/api/analyze', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    selected_answers: answers,
+                    prompt: prompt
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({ detail: 'Ошибка анализа' }));
+                throw new Error(error.detail || `HTTP ${response.status}`);
+            }
+
+            // Потоковое чтение ответа
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            
+            resultDiv.innerHTML = '';
+            
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                
+                const text = decoder.decode(value);
+                lastAnalysisResult += text;
+                resultDiv.textContent = lastAnalysisResult;
+                resultDiv.scrollTop = resultDiv.scrollHeight;
+            }
+
+        } catch (e) {
+            resultDiv.textContent = `❌ Ошибка: ${e.message}`;
+            lastAnalysisResult = `Ошибка: ${e.message}`;
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '🚀 Запустить анализ';
+        }
+    }
+    
+    function downloadResult() {
+        if (!lastAnalysisResult) {
+            alert('Нет результата для скачивания');
+            return;
+        }
+        
+        const blob = new Blob([lastAnalysisResult], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `analysis_${new Date().toISOString().slice(0,10)}.md`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    // Инициализация при загрузке
+    document.addEventListener('DOMContentLoaded', async () => {
+        await loadData();
+    });
 </script>
 </body>
 </html>

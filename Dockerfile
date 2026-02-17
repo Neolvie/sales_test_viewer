@@ -11,8 +11,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Копируем код приложения
 COPY . .
 
-# Открываем порт 8055
-EXPOSE 8055
+# Открываем порт 8000
+EXPOSE 8000
 
 # Запускаем сервер
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8055"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
