@@ -1,5 +1,6 @@
 (function () {
     var LS_KEY_NAME = 'salestester_full_name';
+    var BP = (window.BASE_PATH || '');
     var themes = [];
     var selectedThemeId = null;
     var selectedThemeName = '';
@@ -11,7 +12,7 @@
     var timeoutTickInterval = null;
 
     // Load config (timeout) from backend
-    fetch('/api/config').then(function (r) { return r.json(); }).then(function (cfg) {
+    fetch(BP + '/api/config').then(function (r) { return r.json(); }).then(function (cfg) {
         if (cfg.test_timeout_minutes > 0) timeoutMinutes = cfg.test_timeout_minutes;
     }).catch(function () {});
 
@@ -93,7 +94,7 @@
 
     function loadThemes() {
         themeList.innerHTML = '<p>Загрузка тем...</p>';
-        fetch('/api/themes')
+        fetch(BP + '/api/themes')
             .then(function (r) { return r.json(); })
             .then(function (data) {
                 themes = data;
@@ -194,7 +195,7 @@
         form.append('theme_id', selectedThemeId);
         form.append('audio', blob, 'recording.webm');
 
-        fetch('/api/test', { method: 'POST', body: form })
+        fetch(BP + '/api/test', { method: 'POST', body: form })
             .then(function (r) {
                 var ct = r.headers.get('content-type') || '';
                 if (!r.ok) {

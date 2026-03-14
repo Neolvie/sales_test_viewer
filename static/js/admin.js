@@ -12,7 +12,10 @@
         return t ? { 'Authorization': 'Bearer ' + t } : {};
     }
 
+    var BP = (window.BASE_PATH || '');
+
     function api(url, options) {
+        if (url.charAt(0) === '/') url = BP + url;
         options = options || {};
         options.headers = Object.assign({}, options.headers || {}, getAuthHeader());
         return fetch(url, options).then(function (r) {

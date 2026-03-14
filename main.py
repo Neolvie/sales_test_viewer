@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from fastapi import FastAPI, Depends, HTTPException, Header, UploadFile, File, Form
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -24,6 +24,16 @@ app = FastAPI()
 
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
 TEST_TIMEOUT_MINUTES = int(os.getenv("TEST_TIMEOUT_MINUTES", "20"))
+ROOT_PATH = os.getenv("ROOT_PATH", "").rstrip("/")
+
+
+def _serve_html(filename: str) -> HTMLResponse:
+    """Serve an HTML file with window.BASE_PATH injected."""
+    with open(f"static/{filename}", "r", encoding="utf-8") as f:
+        content = f.read()
+    script = f'<script>window.BASE_PATH="{ROOT_PATH}";</script>'
+    content = content.replace("</head>", script + "\n</head>", 1)
+    return HTMLResponse(content)
 
 
 @app.get("/api/config")
@@ -388,9 +398,14 @@ async def admin_analyze(request: AnalysisRequest, _: bool = Depends(require_admi
 # ---------- Static & pages ----------
 
 
+@app.get("/")
+def serve_index():
+    return _serve_html("index.html")
+
+
 @app.get("/admin")
 def serve_admin():
-    return FileResponse("static/admin.html")
+    return _serve_html("admin.html")
 
 
-app.mount("/", StaticFiles(directory="static", html=True), name="static")
+app.mount("/", StaticFiles(directory="static", html=False), name="static")

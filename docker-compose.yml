@@ -36,6 +36,7 @@ services:
       - LLM_MODEL=${LLM_MODEL}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - TEST_TIMEOUT_MINUTES=${TEST_TIMEOUT_MINUTES:-20}
+      - ROOT_PATH=${ROOT_PATH:-}
     depends_on:
       db:
         condition: service_healthy
