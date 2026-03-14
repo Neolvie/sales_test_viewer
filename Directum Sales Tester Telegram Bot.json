@@ -1,0 +1,1654 @@
+{
+  "name": "Directum Sales Tester Telegram Bot",
+  "nodes": [
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $('Telegram Trigger').item.json.message.voice.file_id }}",
+        "additionalFields": {}
+      },
+      "id": "0beb9cc3-68c1-4684-9f97-f8e2d8bb56a5",
+      "name": "Get Audio File",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        1232,
+        64
+      ],
+      "webhookId": "3984cb91-d8a5-45d8-8978-2c67049a25cc",
+      "typeVersion": 1.2,
+      "credentials": {
+        "telegramApi": {
+          "id": "Y1uVfWmw8gxCuEgQ",
+          "name": "Directum Sale Knowledge Test Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {
+          "download": true
+        }
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -304,
+        224
+      ],
+      "id": "c933e6aa-c234-4198-bb7d-9fa8092de635",
+      "name": "Telegram Trigger",
+      "webhookId": "05859fed-b11a-4efc-989a-dfb41e70fa76",
+      "credentials": {
+        "telegramApi": {
+          "id": "Y1uVfWmw8gxCuEgQ",
+          "name": "Directum Sale Knowledge Test Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "=Чтобы начать тестирование отправьте команду /start",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "77b51c4f-6db4-4646-a3f6-1ca9f5741f7e",
+      "name": "Use /start",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        1504,
+        1104
+      ],
+      "webhookId": "032bd625-94ec-4912-8f79-fcbb3292ac24",
+      "typeVersion": 1.2,
+      "credentials": {
+        "telegramApi": {
+          "id": "Y1uVfWmw8gxCuEgQ",
+          "name": "Directum Sale Knowledge Test Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "operation": "transcribe",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        1472,
+        64
+      ],
+      "id": "a559e041-6132-4fe2-b3fc-7499eccb0029",
+      "name": "OpenAI",
+      "credentials": {
+        "openAiApi": {
+          "id": "R530LdQpngw6GbFc",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Роль:\nТы — строгий, но справедливый AI-тренер по продуктам в крупной IT-компании. Твоя задача — объективно оценить, насколько хорошо менеджер по продажам знает и может устно передать ценностное предложение продукта.\n\nКонтекст задачи:\nМенеджер записал голосовое сообщение с презентацией ценностного предложения по конкретному продукту. Ты получил два ключевых документа:\n\nЭталонный документ: Оригинальный текст ценностного предложения продукта.\nТекст менеджера: Расшифровка голосового сообщения менеджера.\n\nТвоя задача — сравнить текст менеджера с эталонным документом и выставить оценку от 1 до 5 по четко определенным критериям.\n\nИнструкции по анализу и оценке:\n\nОпределение полноты и соответствия:\nСравни рассказ менеджера с эталонным документом по смыслу, а не дословно. Цени свободную, адаптированную под клиента речь.\nСфокусируйся на выявлении ключевых смысловых блоков (согласно структуре эталонного документа):\n\nПроблемы бизнес-заказчиков: Обрати внимание, упомянул ли менеджер проблемы для всех ролей, указанных в эталоне (например, HR, руководители, рядовые пользователи).\nРешения и выгоды: Проверь, описал ли менеджер решения и выгоды для каждой из затронутых в эталоне ролей.\nУспешные кейсы (если есть в эталоне): Если в эталонном документе приведены кейсы, проверь, упомянул ли их менеджер. Если кейсов в эталоне нет, а менеджер их привел — это нейтральный или слабоположительный момент, но не ошибка.\n\nКритерии для итоговой оценки:\n\nОценка 5 (Отлично):\nУсловие: В рассказе присутствуют все ключевые смысловые блоки — проблемы бизнес-заказчиков, решения и выгоды, а также успешные кейсы (если они есть в эталоне). Содержание совпадает с эталоном не менее чем на 85% по смыслу.\nВажно: Рассказ НЕ должен быть дословным повторением эталона. Это живая, адаптированная речь, передающая всю суть.\n\nОценка 4 (Хорошо):\nУсловие: В рассказе присутствуют все ключевые смысловые блоки — проблемы бизнес-заказчиков, решения и выгоды, а также успешные кейсы (если они есть в эталоне). Содержание совпадает с эталоном от 70% до 85% по смыслу. Допускается отсутствие отдельных подпунктов внутри смысловых блоков.\n\nОценка 3 (Удовлетворительно):\nУсловие: В рассказе присутствуют блоки \"Проблемы бизнес-заказчиков\" и \"Решения и выгоды\", но отсутствует блок \"Успешные кейсы\", если он был в эталоне. Содержание смысловых блоков совпадает с эталоном от 50% до 70% по смыслу.\n\nОценка 2 и 1 (Неудовлетворительно):\nУсловие: Рассказ менеджера соответствует эталонному ценностному предложению менее чем на 50%. Смысловые блоки раскрыты фрагментарно или неверно.\n\nОсобое внимание на успешные кейсы:\nЕсли кейсы есть в эталоне, а менеджер их не упомянул — это минус при оценке полноты.\nЕсли кейсов нет в эталоне, а менеджер их привел — это не влияет на снижение оценки. Напротив, в фидбэке следует отметить: \"Вы привели примеры из практики, что является хорошим дополнением, даже несмотря на их отсутствие в исходном документе\".\n\nФормат итогового ответа:\nТвой ответ должен быть строго структурирован, быть кратким и содержать три раздела:\n\n1. Итоговая оценка: [Цифра от 1 до 5]\n\n2. Обоснование оценки:\nПодробно опиши, какие смысловые блоки и подпункты были раскрыты полностью. Называй блоки только по их сутевым названиям: \"Проблемы бизнес-заказчиков\", \"Решения и выгоды\", \"Успешные кейсы\".\nЧетко укажи, что именно было пропущено или искажено по сравнению с эталонным документом.\nЕсли оценка не 5, объясни, каких конкретно критериев не хватило для более высокой оценки.\nПиши так, как будто ты обращаешься к сотруднику напрямую.\n\n3. Рекомендации по улучшению:\nДай конкретные советы, что менеджеру нужно добавить или перефразировать в своем рассказе, чтобы улучшить оценку в следующий раз.\nСфокусируйся на пропущенных элементах из эталонного документа.\nЕсли речь была слишком \"заученной\", порекомендуй сделать ее более естественной.\n\n\nЭталонный документ:\n\"{{ $json.text }}\"\n\n\nТекст менеджера:\n\"{{ $('OpenAI').item.json.text }}\"\n\n",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.8,
+      "position": [
+        1840,
+        64
+      ],
+      "id": "c2cc9a2f-e959-4028-adb0-5b7b31ab9b05",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-5-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1808,
+        272
+      ],
+      "id": "33de1821-b762-4d99-96b2-98ab3f395778",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "R530LdQpngw6GbFc",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "n8n_sales_test_sessions",
+          "mode": "list",
+          "cachedResultName": "n8n_sales_test_sessions"
+        },
+        "where": {
+          "values": [
+            {
+              "column": "chat_id",
+              "condition": "LIKE",
+              "value": "={{ $('Telegram Trigger').item.json.message.chat.id + '' }}"
+            },
+            {
+              "column": "state",
+              "value": "0"
+            }
+          ]
+        },
+        "options": {
+          "outputColumns": [
+            "id",
+            "theme_id",
+            "created_at"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        128,
+        224
+      ],
+      "id": "f08a0e79-70d0-4073-96de-712fcf15a026",
+      "name": "Get Current Session",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "ndFg06bbtcjAs0XZ",
+          "name": "Postgres Supabase Chat Memory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "2ecdc00c-5af4-4214-baeb-3c80f3721df2",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        320,
+        224
+      ],
+      "id": "8007d000-9cdf-4d5f-8c68-e8501ac7b73f",
+      "name": "If Test Session"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "127f9188-7eab-4fc8-8317-f3ffbcedb4ab",
+              "leftValue": "={{ $('Telegram Trigger').item.json.message.text }}",
+              "rightValue": "/start",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        528,
+        544
+      ],
+      "id": "a2501266-6cae-46a7-822f-53b63140fe1c",
+      "name": "If Command /start"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "n8n_sales_test_themes",
+          "mode": "list",
+          "cachedResultName": "n8n_sales_test_themes"
+        },
+        "where": {
+          "values": [
+            {
+              "column": "id",
+              "value": "={{ $('Get Current Session').item.json.theme_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1648,
+        64
+      ],
+      "id": "d865a582-1f3e-444f-a5aa-475f89f8ae3b",
+      "name": "Get Theme To Check",
+      "credentials": {
+        "postgres": {
+          "id": "ndFg06bbtcjAs0XZ",
+          "name": "Postgres Supabase Chat Memory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "n8n_sales_test_sessions",
+          "mode": "list",
+          "cachedResultName": "n8n_sales_test_sessions"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('Get Current Session').item.json.id }}",
+            "state": 1,
+            "result": "={{ $json.output }}",
+            "user_answer": "={{ $('OpenAI').item.json.text }}",
+            "answered_at": "={{ $now.toUTC().toISO() }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "state",
+              "displayName": "state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "theme_id",
+              "displayName": "theme_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "result",
+              "displayName": "result",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "first_name",
+              "displayName": "first_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "last_name",
+              "displayName": "last_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "username",
+              "displayName": "username",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "user_answer",
+              "displayName": "user_answer",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "answered_at",
+              "displayName": "answered_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2112,
+        64
+      ],
+      "id": "683a4b21-d526-4ed3-bf7d-3cc1d1d99d66",
+      "name": "Update Result",
+      "credentials": {
+        "postgres": {
+          "id": "ndFg06bbtcjAs0XZ",
+          "name": "Postgres Supabase Chat Memory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "=Запишите голосовое сообщение по теме, которая Вам досталась",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "ae3828e7-996b-4e3f-9dfb-a4c6c4131938",
+      "name": "Send a Audio",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        1312,
+        -128
+      ],
+      "webhookId": "8734c034-1307-4d35-afbb-11c0fc5d956f",
+      "typeVersion": 1.2,
+      "credentials": {
+        "telegramApi": {
+          "id": "Y1uVfWmw8gxCuEgQ",
+          "name": "Directum Sale Knowledge Test Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "8c8a93da-973d-4458-ba79-e9d33cfca735",
+              "leftValue": "={{ $json.message.forward_origin }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -112,
+        224
+      ],
+      "id": "4f968509-3105-47f9-b0ba-0c5097a2c7b3",
+      "name": "If Forward"
+    },
+    {
+      "parameters": {
+        "content": "# TODO\n\n- добавить фиксацию времени ответа\n- ?можно ли фиксировать длительность записи высчитывать задержку после выдачи темы?",
+        "height": 169,
+        "width": 513,
+        "color": 7
+      },
+      "id": "e684c4ec-793f-409a-825a-e8a135b4256c",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -128,
+        -192
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "84498218-aed3-4304-9b59-2eaad21fccf0",
+              "leftValue": "={{ $('Telegram Trigger').item.json.message.voice.file_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notExists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        48
+      ],
+      "id": "432c0d72-6103-4195-9042-889e38aebb71",
+      "name": "If Not Voice Record"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "=Время на ответ истекло",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "02253d46-1629-4a33-969b-9f0374461331",
+      "name": "Time Spent Message",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        1232,
+        272
+      ],
+      "webhookId": "1a5f6a5a-60d6-4a9f-96a1-ef875ee09cef",
+      "typeVersion": 1.2,
+      "credentials": {
+        "telegramApi": {
+          "id": "Y1uVfWmw8gxCuEgQ",
+          "name": "Directum Sale Knowledge Test Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "fb5df571-ded3-4c5f-aa6b-243236808412",
+              "leftValue": "={{ (Date.now() - new Date($node[\"Get Current Session\"].json[\"created_at\"]).getTime()) <= 30 * 60 * 1000 }}",
+              "rightValue": "=",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        656,
+        128
+      ],
+      "id": "2cddab36-52a0-46ca-b83e-fc44c859d81a",
+      "name": "Answer Timeout"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "n8n_sales_test_sessions",
+          "mode": "list",
+          "cachedResultName": "n8n_sales_test_sessions"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('Get Current Session').item.json.id }}",
+            "result": "Время истекло",
+            "state": 2
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "state",
+              "displayName": "state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "theme_id",
+              "displayName": "theme_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "result",
+              "displayName": "result",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "first_name",
+              "displayName": "first_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "last_name",
+              "displayName": "last_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "username",
+              "displayName": "username",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "user_answer",
+              "displayName": "user_answer",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        960,
+        272
+      ],
+      "id": "e610f947-dfff-47dc-8731-a4c1622a90be",
+      "name": "Answer Timeouted",
+      "credentials": {
+        "postgres": {
+          "id": "ndFg06bbtcjAs0XZ",
+          "name": "Postgres Supabase Chat Memory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "n8n_sales_test_themes",
+          "mode": "list",
+          "cachedResultName": "n8n_sales_test_themes"
+        },
+        "limit": 100,
+        "where": {
+          "values": [
+            {
+              "column": "state",
+              "value": "1"
+            }
+          ]
+        },
+        "sort": {
+          "values": [
+            {
+              "column": "id"
+            }
+          ]
+        },
+        "options": {
+          "outputColumns": [
+            "id",
+            "name"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        896,
+        608
+      ],
+      "id": "b56649da-ec5b-4dab-96a4-7d9d5da6cc56",
+      "name": "Select All Themes",
+      "credentials": {
+        "postgres": {
+          "id": "ndFg06bbtcjAs0XZ",
+          "name": "Postgres Supabase Chat Memory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1136,
+        608
+      ],
+      "id": "7f0e9aca-c0e3-48c9-9d52-17397df56874",
+      "name": "Все темы"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Самый надежный способ для n8n Aggregate\nconst inputItem = $input.first();\nlet items = [];\n\n// Проверяем все возможные места где может быть массив\nif (inputItem.json && Array.isArray(inputItem.json)) {\n  items = inputItem.json;\n} else if (inputItem.json && inputItem.json.data && Array.isArray(inputItem.json.data)) {\n  items = inputItem.json.data;\n} else {\n  items = [];\n}\n\nconst messageLines = items.map(item => `${item.id}. ${item.name}. /theme${item.id}`);\nconst telegramMessage = messageLines.join('\\n\\n') || 'Список пуст';\n\nreturn [{\n  json: {\n    message: telegramMessage,\n    parse_mode: 'HTML'\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        608
+      ],
+      "id": "406c88bb-7135-46e7-94b6-488762b5c0c8",
+      "name": "Список тем"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Берем массив тем из блока \"Все темы\" → поле data\nconst themesData = $node[\"Все темы1\"].json.data || [];\n\n// Извлекаем только цифры из сообщения пользователя\nconst userNumber = $('Номер темы').first().json.theme\n\n// Проверяем условия\nif (!userNumber || themesData.length === 0) {\n  return [{\n    json: {\n      isValid: false,\n      error: \"Введите номер темы (только цифру)\",\n      validIds: themesData.map(t => t.id)\n    }\n  }];\n}\n\n// Проверяем что номер существует в списке тем\nconst themeId = parseInt(userNumber);\nconst selectedTheme = themesData.find(theme => parseInt(theme.id) === themeId);\n\nif (!selectedTheme) {\n  return [{\n    json: {\n      isValid: false,\n      error: `Темы с номером ${userNumber} не существует`,\n      validIds: themesData.map(t => t.id)\n    }\n  }];\n}\n\n// ✅ Валидный номер\nreturn [{\n  json: {\n    isValid: true,\n    themeId: themeId,\n    themeName: selectedTheme.name,\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1744,
+        800
+      ],
+      "id": "0de15bc9-21c6-483e-8eb5-3c0e3c425031",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "n8n_sales_test_sessions",
+          "mode": "list",
+          "cachedResultName": "n8n_sales_test_sessions"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "theme_id": "={{ $json.themeId }}",
+            "chat_id": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+            "first_name": "={{ $('Telegram Trigger').item.json.message.from.first_name }}",
+            "last_name": "={{ $('Telegram Trigger').item.json.message.from.last_name }}",
+            "username": "={{ $('Telegram Trigger').item.json.message.from.username }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "state",
+              "displayName": "state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "theme_id",
+              "displayName": "theme_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "result",
+              "displayName": "result",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "first_name",
+              "displayName": "first_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_name",
+              "displayName": "last_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "username",
+              "displayName": "username",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2288,
+        768
+      ],
+      "id": "511f9f8e-f018-440e-a34f-93a3aea84421",
+      "name": "Сохранить выбор",
+      "credentials": {
+        "postgres": {
+          "id": "ndFg06bbtcjAs0XZ",
+          "name": "Postgres Supabase Chat Memory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "167b7ef9-4474-45f3-93ae-2474126c1076",
+              "leftValue": "={{ $json.isValid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2016,
+        784
+      ],
+      "id": "573a38a4-75b7-42e0-94b8-ac0644af96f0",
+      "name": "Тема выбрана корректно?"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "=Вы выбрали тему: {{ $('Code in JavaScript').item.json.themeName }}\n\nЗапишите голосовое сообщение, в котором Вы максимально подробно раскрываете эту тему (одним аудиосообщением). На ответ дается 15 минут, начиная с текущего времени. Удачи!",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2544,
+        768
+      ],
+      "id": "9f9f23f8-2105-48ed-87c6-c8ee26dfa393",
+      "name": "Тема выбрана",
+      "webhookId": "d955a021-c4e0-41b5-aa45-136d8b20bf55",
+      "credentials": {
+        "telegramApi": {
+          "id": "Y1uVfWmw8gxCuEgQ",
+          "name": "Directum Sale Knowledge Test Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "={{ $json.error }}\n\nНачать заново - /start",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2304,
+        992
+      ],
+      "id": "6691c4e2-4c0f-4fa3-84b4-4a03afd755f8",
+      "name": "Ошибка выбора темы",
+      "webhookId": "d955a021-c4e0-41b5-aa45-136d8b20bf55",
+      "credentials": {
+        "telegramApi": {
+          "id": "Y1uVfWmw8gxCuEgQ",
+          "name": "Directum Sale Knowledge Test Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "=Выберите тему:\n{{ $json.message }}\n\n<b>Нажмите на ссылку рядом с выбранной темой или отправьте в ответном сообщении ее номер</b>",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1632,
+        592
+      ],
+      "id": "a9ea41b0-74f3-4075-a879-bcc8a2f719b2",
+      "name": "Сообщение со списком тем",
+      "webhookId": "060d3c07-3efd-4237-b45c-0153f4cfb58f",
+      "credentials": {
+        "telegramApi": {
+          "id": "Y1uVfWmw8gxCuEgQ",
+          "name": "Directum Sale Knowledge Test Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "31d0cc32-24e4-485f-a160-5c2f8a29b7c3",
+              "leftValue": "={{ $json.theme }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1024,
+        848
+      ],
+      "id": "83a96114-b1bb-49f5-b5fc-f80605f55dea",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = $('Telegram Trigger').first().json.message.text;\n\n// Убираем префикс /theme и преобразуем в число\nconst theme = Number(text.replace('/theme', '')) || 0;\n\nreturn { theme };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        800
+      ],
+      "id": "ec0ef4ef-0a7c-4de7-a327-4e9e2c9412bc",
+      "name": "Номер темы"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "n8n_sales_test_themes",
+          "mode": "list",
+          "cachedResultName": "n8n_sales_test_themes"
+        },
+        "limit": 100,
+        "where": {
+          "values": [
+            {
+              "column": "state",
+              "value": "1"
+            }
+          ]
+        },
+        "sort": {
+          "values": [
+            {
+              "column": "id"
+            }
+          ]
+        },
+        "options": {
+          "outputColumns": [
+            "id",
+            "name"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1280,
+        800
+      ],
+      "id": "e08fab2e-dd01-4fbf-bbce-9377aaa40c2f",
+      "name": "Select All Themes1",
+      "credentials": {
+        "postgres": {
+          "id": "ndFg06bbtcjAs0XZ",
+          "name": "Postgres Supabase Chat Memory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1520,
+        800
+      ],
+      "id": "618ba781-29f3-47bd-8156-9a51083dba63",
+      "name": "Все темы1"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        2800,
+        96
+      ],
+      "id": "9c7b8750-31bc-40f9-986f-4da074ee75d7",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Забираем текст из первого элемента выхода узла \"AI Agent\"\nconst text = $('Result Message').first().json.text || '';\n\n// Режем регуляркой по 4000 любых символов (включая пробелы и переносы)\n// Если текст пустой, вернет пустой массив (или можно оставить один пустой объект)\nconst chunks = text.match(/[\\s\\S]{1,4000}/g) || [text];\n\n// Возвращаем в формате, который ждет n8n\nreturn chunks.map(chunk => ({\n  json: { \n    text: chunk \n  }\n}));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2560,
+        96
+      ],
+      "id": "84d636ee-7182-4af3-bef5-85c5311403ed",
+      "name": "Split Text Into Messages"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f19695f4-4ef0-4991-a6f0-26bab2391328",
+              "name": "=text",
+              "value": "={{ $('AI Agent').item.json.output}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2352,
+        64
+      ],
+      "id": "edd59686-f328-4de4-bb85-63a49ecb7cf1",
+      "name": "Result Message"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "=None"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3024,
+        112
+      ],
+      "id": "843e11a6-71c7-4ce8-83f9-3e3d51d28c89",
+      "name": "Send a text message1",
+      "webhookId": "f22e2644-b074-4d1f-be48-64a32b3a786d",
+      "credentials": {
+        "telegramApi": {
+          "id": "Y1uVfWmw8gxCuEgQ",
+          "name": "Directum Sale Knowledge Test Bot"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Get Audio File": {
+      "main": [
+        [
+          {
+            "node": "OpenAI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "If Forward",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI": {
+      "main": [
+        [
+          {
+            "node": "Get Theme To Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Update Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Current Session": {
+      "main": [
+        [
+          {
+            "node": "If Test Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Command /start": {
+      "main": [
+        [
+          {
+            "node": "Select All Themes",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Номер темы",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Test Session": {
+      "main": [
+        [
+          {
+            "node": "Answer Timeout",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If Command /start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Theme To Check": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Result": {
+      "main": [
+        [
+          {
+            "node": "Result Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Forward": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Get Current Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Not Voice Record": {
+      "main": [
+        [
+          {
+            "node": "Send a Audio",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Audio File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Answer Timeout": {
+      "main": [
+        [
+          {
+            "node": "If Not Voice Record",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Answer Timeouted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Answer Timeouted": {
+      "main": [
+        [
+          {
+            "node": "Time Spent Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select All Themes": {
+      "main": [
+        [
+          {
+            "node": "Все темы",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Все темы": {
+      "main": [
+        [
+          {
+            "node": "Список тем",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Список тем": {
+      "main": [
+        [
+          {
+            "node": "Сообщение со списком тем",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Тема выбрана корректно?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Тема выбрана корректно?": {
+      "main": [
+        [
+          {
+            "node": "Сохранить выбор",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ошибка выбора темы",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Сохранить выбор": {
+      "main": [
+        [
+          {
+            "node": "Тема выбрана",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Select All Themes1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Use /start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Номер темы": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select All Themes1": {
+      "main": [
+        [
+          {
+            "node": "Все темы1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Все темы1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Send a text message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Text Into Messages": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Result Message": {
+      "main": [
+        [
+          {
+            "node": "Split Text Into Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a text message1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Samara",
+    "callerPolicy": "workflowsFromSameOwner",
+    "timeSavedPerExecution": 30,
+    "saveDataSuccessExecution": "all",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed"
+  },
+  "versionId": "9ce10306-05a0-4268-aabe-52ec768bdff4",
+  "meta": {
+    "templateId": "2986",
+    "templateCredsSetupCompleted": true,
+    "instanceId": "9015fd559d7cfaf141dc1b946742410425b4528e75b4395d69038fb571951995"
+  },
+  "id": "A6OlTbbDlMaroaNx",
+  "tags": []
+}

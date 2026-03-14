@@ -1,6 +1,20 @@
-version: "3.9"
-
 services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:-salestester}
+      POSTGRES_USER: ${DB_USER:-salestester}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-salestester} -d ${DB_NAME:-salestester}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   app:
     build: .
     ports:
@@ -8,11 +22,24 @@ services:
     env_file:
       - .env
     environment:
-      # Supabase connection
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=${DB_NAME:-salestester}
+      - DB_USER=${DB_USER:-salestester}
+      - DB_PASSWORD=${DB_PASSWORD:-changeme}
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_KEY=${SUPABASE_KEY}
-      # LLM connection
-      - LLM_API_KEY=${LLM_API_KEY}
-      - LLM_BASE_URL=${LLM_BASE_URL}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENROUTER_BASE_URL=${OPENROUTER_BASE_URL}
       - LLM_MODEL=${LLM_MODEL}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - TEST_TIMEOUT_MINUTES=${TEST_TIMEOUT_MINUTES:-20}
+    depends_on:
+      db:
+        condition: service_healthy
     restart: unless-stopped
+
+volumes:
+  pgdata:

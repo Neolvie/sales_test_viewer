@@ -1,144 +1,396 @@
 import os
-from fastapi import FastAPI, HTTPException
-from fastapi.staticfiles import StaticFiles
+from typing import List, Optional
+
+from dotenv import load_dotenv
+load_dotenv()
+
+from fastapi import FastAPI, Depends, HTTPException, Header, UploadFile, File, Form
 from fastapi.responses import FileResponse, StreamingResponse
-from supabase import create_client, Client
-from typing import List, Dict, Any
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-import json
-from openai import AsyncOpenAI
+from sqlalchemy.orm import Session
+from sqlalchemy import desc, and_, or_, func as sql_func
 
-# Инициализация Supabase из переменных окружения
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+from database import get_engine, SessionLocal, Theme, Prompt, Session as DBSession, PromptTest
+from services import (
+    transcribe_audio,
+    evaluate_answer_async,
+    extract_score_from_result,
+    DEFAULT_EVALUATION_PROMPT,
+)
 
-# Настройки LLM из переменных окружения
-LLM_API_KEY = os.getenv("LLM_API_KEY")
-LLM_BASE_URL = os.getenv("LLM_BASE_URL")
-LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4o")
-
-DEFAULT_ANALYSIS_PROMPT = "проанализируй и обобщи наиболее явные ошибки и дай рекомендации"
-
-if not SUPABASE_URL or not SUPABASE_KEY:
-    print("WARNING: SUPABASE_URL or SUPABASE_KEY not found in env vars")
 
 app = FastAPI()
 
-def get_supabase() -> Client:
-    return create_client(SUPABASE_URL, SUPABASE_KEY)
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
+TEST_TIMEOUT_MINUTES = int(os.getenv("TEST_TIMEOUT_MINUTES", "20"))
 
-def get_llm_client() -> AsyncOpenAI:
-    kwargs = {"api_key": LLM_API_KEY or "dummy"}
-    if LLM_BASE_URL:
-        kwargs["base_url"] = LLM_BASE_URL
-    return AsyncOpenAI(**kwargs)
+
+@app.get("/api/config")
+def get_config():
+    """Public endpoint returning frontend configuration."""
+    return {"test_timeout_minutes": TEST_TIMEOUT_MINUTES}
+
+
+@app.on_event("startup")
+def create_default_prompt():
+    """Создаёт активный дефолтный промт при первом запуске, если промтов ещё нет."""
+    db = SessionLocal()
+    try:
+        if db.query(Prompt).count() == 0:
+            p = Prompt(version=1, content=DEFAULT_EVALUATION_PROMPT, is_active=True, is_draft=False,
+                       notes="Дефолтный промт из n8n-бота")
+            db.add(p)
+            db.commit()
+    except Exception as e:
+        print(f"Startup: could not create default prompt: {e}")
+    finally:
+        db.close()
+
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+def require_admin(authorization: Optional[str] = Header(None)):
+    if not ADMIN_PASSWORD:
+        raise HTTPException(status_code=503, detail="ADMIN_PASSWORD not configured")
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+    token = authorization[7:].strip()
+    if token != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Invalid password")
+    return True
+
+
+# ---------- Public API (seller) ----------
+
+
+@app.get("/api/themes")
+def list_themes(db: Session = Depends(get_db)):
+    rows = db.query(Theme).filter(Theme.is_active == True).order_by(Theme.name).all()
+    return [{"id": t.id, "name": t.name} for t in rows]
+
+
+@app.post("/api/test")
+async def submit_test(
+    full_name: str = Form(...),
+    theme_id: int = Form(...),
+    audio: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    theme = db.query(Theme).filter(Theme.id == theme_id, Theme.is_active == True).first()
+    if not theme:
+        raise HTTPException(status_code=400, detail="Theme not found or inactive")
+
+    audio_bytes = await audio.read()
+    if not audio_bytes:
+        raise HTTPException(status_code=400, detail="Пустой аудиофайл")
+
+    try:
+        user_answer = transcribe_audio(audio_bytes, filename=audio.filename or "audio.webm")
+    except Exception as e:
+        print(f"Whisper error: {e}")
+        raise HTTPException(status_code=502, detail=f"Ошибка распознавания речи: {e}")
+
+    active_prompt = db.query(Prompt).filter(Prompt.is_active == True).first()
+    prompt_content = active_prompt.content if active_prompt else DEFAULT_EVALUATION_PROMPT
+
+    try:
+        result_text = await evaluate_answer_async(theme.reference_text, user_answer, prompt_content)
+    except Exception as e:
+        print(f"LLM error: {e}")
+        raise HTTPException(status_code=502, detail=f"Ошибка оценки ответа: {e}")
+
+    score = extract_score_from_result(result_text)
+
+    from datetime import datetime, timezone
+    session = DBSession(
+        state=1,
+        theme_id=theme_id,
+        full_name=full_name.strip(),
+        user_answer=user_answer,
+        result=result_text,
+        score=score,
+        answered_at=datetime.now(timezone.utc),
+    )
+    if active_prompt:
+        session.prompt_id = active_prompt.id
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+
+    return {
+        "session_id": session.id,
+        "result": result_text,
+        "score": score,
+        "user_answer": user_answer,
+    }
+
+
+# ---------- Admin API (password-protected) ----------
+
+
+@app.get("/api/admin/sessions")
+def admin_list_sessions(
+    page: int = 1,
+    limit: int = 20,
+    name: Optional[str] = None,
+    theme_id: Optional[int] = None,
+    score: Optional[int] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    _: bool = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    q = db.query(DBSession).filter(DBSession.state == 1)
+    if name and name.strip():
+        q = q.filter(DBSession.full_name.ilike(f"%{name.strip()}%"))
+    if theme_id is not None:
+        q = q.filter(DBSession.theme_id == theme_id)
+    if score is not None:
+        q = q.filter(DBSession.score == score)
+    if date_from:
+        q = q.filter(DBSession.created_at >= date_from)
+    if date_to:
+        # include the full end day: add 1 day and use strict less-than
+        from datetime import date as _date, timedelta as _td
+        try:
+            dt_to_exclusive = (_date.fromisoformat(date_to) + _td(days=1)).isoformat()
+            q = q.filter(DBSession.created_at < dt_to_exclusive)
+        except ValueError:
+            pass
+
+    total = q.count()
+    q = q.order_by(desc(DBSession.created_at)).offset((page - 1) * limit).limit(limit)
+    rows = q.all()
+
+    theme_ids = {r.theme_id for r in rows}
+    themes_map = {}
+    if theme_ids:
+        for t in db.query(Theme).filter(Theme.id.in_(theme_ids)).all():
+            themes_map[t.id] = t.name
+
+    data = []
+    for r in rows:
+        data.append({
+            "id": r.id,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+            "answered_at": r.answered_at.isoformat() if r.answered_at else None,
+            "full_name": r.full_name,
+            "theme_id": r.theme_id,
+            "theme_name": themes_map.get(r.theme_id, "—"),
+            "result": r.result or "",
+            "user_answer": r.user_answer or "",
+            "score": r.score,
+        })
+    return {"data": data, "total": total, "page": page, "limit": limit}
+
+
+@app.get("/api/admin/themes")
+def admin_list_themes(_: bool = Depends(require_admin), db: Session = Depends(get_db)):
+    rows = db.query(Theme).order_by(Theme.name).all()
+    return [
+        {"id": t.id, "name": t.name, "reference_text": t.reference_text, "is_active": t.is_active, "created_at": t.created_at.isoformat() if t.created_at else None}
+        for t in rows
+    ]
+
+
+class ThemeCreate(BaseModel):
+    name: str
+    reference_text: str
+    is_active: bool = True
+
+
+class ThemeUpdate(BaseModel):
+    name: Optional[str] = None
+    reference_text: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+@app.post("/api/admin/themes")
+def admin_create_theme(body: ThemeCreate, _: bool = Depends(require_admin), db: Session = Depends(get_db)):
+    t = Theme(name=body.name.strip(), reference_text=body.reference_text.strip(), is_active=body.is_active)
+    db.add(t)
+    db.commit()
+    db.refresh(t)
+    return {"id": t.id, "name": t.name, "reference_text": t.reference_text, "is_active": t.is_active}
+
+
+@app.put("/api/admin/themes/{theme_id}")
+def admin_update_theme(theme_id: int, body: ThemeUpdate, _: bool = Depends(require_admin), db: Session = Depends(get_db)):
+    t = db.query(Theme).filter(Theme.id == theme_id).first()
+    if not t:
+        raise HTTPException(status_code=404, detail="Theme not found")
+    if body.name is not None:
+        t.name = body.name.strip()
+    if body.reference_text is not None:
+        t.reference_text = body.reference_text.strip()
+    if body.is_active is not None:
+        t.is_active = body.is_active
+    db.commit()
+    db.refresh(t)
+    return {"id": t.id, "name": t.name, "reference_text": t.reference_text, "is_active": t.is_active}
+
+
+@app.delete("/api/admin/themes/{theme_id}")
+def admin_delete_theme(theme_id: int, _: bool = Depends(require_admin), db: Session = Depends(get_db)):
+    t = db.query(Theme).filter(Theme.id == theme_id).first()
+    if not t:
+        raise HTTPException(status_code=404, detail="Theme not found")
+    db.delete(t)
+    db.commit()
+    return {"ok": True}
+
+
+@app.get("/api/admin/prompts/default-template")
+def admin_get_default_prompt_template(_: bool = Depends(require_admin)):
+    return {"content": DEFAULT_EVALUATION_PROMPT}
+
+
+@app.get("/api/admin/prompts")
+def admin_list_prompts(_: bool = Depends(require_admin), db: Session = Depends(get_db)):
+    rows = db.query(Prompt).order_by(desc(Prompt.created_at)).all()
+    return [
+        {
+            "id": p.id,
+            "version": p.version,
+            "content": p.content,
+            "is_active": p.is_active,
+            "is_draft": p.is_draft,
+            "notes": p.notes,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+        }
+        for p in rows
+    ]
+
+
+class PromptCreate(BaseModel):
+    content: str
+    notes: Optional[str] = None
+
+
+class PromptUpdate(BaseModel):
+    content: Optional[str] = None
+    notes: Optional[str] = None
+
+
+@app.post("/api/admin/prompts")
+def admin_create_prompt(body: PromptCreate, _: bool = Depends(require_admin), db: Session = Depends(get_db)):
+    max_ver = db.query(sql_func.coalesce(sql_func.max(Prompt.version), 0)).scalar() or 0
+    p = Prompt(version=max_ver + 1, content=body.content.strip(), is_active=False, is_draft=True, notes=body.notes)
+    db.add(p)
+    db.commit()
+    db.refresh(p)
+    return {"id": p.id, "version": p.version, "content": p.content, "is_draft": True}
+
+
+@app.put("/api/admin/prompts/{prompt_id}")
+def admin_update_prompt(prompt_id: int, body: PromptUpdate, _: bool = Depends(require_admin), db: Session = Depends(get_db)):
+    p = db.query(Prompt).filter(Prompt.id == prompt_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Prompt not found")
+    if not p.is_draft:
+        raise HTTPException(status_code=400, detail="Only draft prompts can be edited")
+    if body.content is not None:
+        p.content = body.content.strip()
+    if body.notes is not None:
+        p.notes = body.notes
+    db.commit()
+    db.refresh(p)
+    return {"id": p.id, "version": p.version, "content": p.content, "notes": p.notes}
+
+
+@app.post("/api/admin/prompts/{prompt_id}/activate")
+def admin_activate_prompt(prompt_id: int, _: bool = Depends(require_admin), db: Session = Depends(get_db)):
+    p = db.query(Prompt).filter(Prompt.id == prompt_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Prompt not found")
+    if not p.is_draft:
+        raise HTTPException(status_code=400, detail="Only draft prompts can be activated")
+    db.query(Prompt).filter(Prompt.is_active == True).update({"is_active": False})
+    p.is_active = True
+    p.is_draft = False
+    db.commit()
+    db.refresh(p)
+    return {"id": p.id, "is_active": True}
+
+
+@app.post("/api/admin/prompts/{prompt_id}/test-on-session/{session_id}")
+async def admin_test_prompt_on_session(
+    prompt_id: int,
+    session_id: int,
+    _: bool = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    p = db.query(Prompt).filter(Prompt.id == prompt_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Prompt not found")
+    s = db.query(DBSession).filter(DBSession.id == session_id, DBSession.state == 1).first()
+    if not s:
+        raise HTTPException(status_code=404, detail="Session not found")
+    theme = db.query(Theme).filter(Theme.id == s.theme_id).first()
+    if not theme:
+        raise HTTPException(status_code=404, detail="Theme not found")
+
+    result_text = await evaluate_answer_async(theme.reference_text, s.user_answer or "", p.content)
+    pt = PromptTest(prompt_id=prompt_id, session_id=session_id, result=result_text)
+    db.add(pt)
+    db.commit()
+    return {"result": result_text, "prompt_test_id": pt.id}
+
 
 class AnalysisRequest(BaseModel):
-    selected_answers: List[Dict[str, Any]]
-    prompt: str = DEFAULT_ANALYSIS_PROMPT
+    selected_answers: List[dict]
+    prompt: str = "проанализируй и обобщи наиболее явные ошибки и дай рекомендации"
 
-@app.get("/api/data")
-async def get_test_results(offset: int = 0, limit: int = 20):
-    try:
-        supabase = get_supabase()
 
-        # 1. Получаем темы (n8n_sales_test_themes)
-        themes_response = supabase.table("n8n_sales_test_themes")\
-            .select("id, name")\
-            .execute()
-        
-        themes_map = {t['id']: t['name'] for t in themes_response.data}
+@app.post("/api/admin/analyze")
+async def admin_analyze(request: AnalysisRequest, _: bool = Depends(require_admin)):
+    if not request.selected_answers:
+        raise HTTPException(status_code=400, detail="Нет выбранных ответов для анализа")
 
-        # 2. Получаем сессии (n8n_sales_test_sessions) с пагинацией
-        sessions_response = supabase.table("n8n_sales_test_sessions")\
-            .select("*", count="exact")\
-            .gte("id", 45)\
-            .eq("state", 1)\
-            .order("created_at", desc=True)\
-            .range(offset, offset + limit - 1)\
-            .execute()
+    from services import get_llm_client_async, LLM_MODEL
+    client = get_llm_client_async()
+    model = LLM_MODEL
 
-        results = []
-        
-        for session in sessions_response.data:
-            first = session.get("first_name") or ""
-            last = session.get("last_name") or ""
-            username = session.get("username") or "no_user"
-            full_name = f"{first} {last} ({username})".strip()
-
-            theme_id = session.get("theme_id")
-            theme_name = themes_map.get(theme_id, "Неизвестная тема")
-
-            results.append({
-                "id": session["id"],
-                "created_at": session["created_at"],
-                "answered_at": session.get("answered_at"),
-                "full_name": full_name,
-                "theme_name": theme_name,
-                "result": session.get("result", ""),
-                "user_answer": session.get("user_answer", "")
-            })
-
-        total_count = sessions_response.count if hasattr(sessions_response, 'count') else len(results)
-        
-        return {
-            "data": results,
-            "total": total_count,
-            "offset": offset,
-            "limit": limit
-        }
-
-    except Exception as e:
-        print(f"Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/analyze")
-async def analyze_answers(request: AnalysisRequest):
-    try:
-        if not request.selected_answers:
-            raise HTTPException(status_code=400, detail="Нет выбранных ответов для анализа")
-        
-        # Формируем контекст из выбранных ответов
-        answers_context = []
-        for idx, answer in enumerate(request.selected_answers, 1):
-            answers_context.append(f"""
+    answers_context = []
+    for idx, answer in enumerate(request.selected_answers, 1):
+        answers_context.append(f"""
 Ответ #{idx}:
 - Сотрудник: {answer.get('full_name', 'Неизвестно')}
 - Тема: {answer.get('theme_name', 'Неизвестно')}
 - Ответ пользователя: {answer.get('user_answer', '')}
 - Результат ИИ: {answer.get('result', '')}
 """)
-        
-        messages = [
-            {"role": "system", "content": "Ты эксперт по анализу продаж и обучению сотрудников. Твоя задача — анализировать ответы сотрудников и выявлять типичные ошибки."},
-            {"role": "user", "content": f"{request.prompt}\n\nДанные для анализа:\n\n" + "\n".join(answers_context)}
-        ]
-        
-        client = get_llm_client()
-        
-        # Потоковая передача ответа
-        async def generate():
-            try:
-                stream = await client.chat.completions.create(
-                    model=LLM_MODEL,
-                    messages=messages,
-                    stream=True,
-                )
-                async for chunk in stream:
-                    if chunk.choices and chunk.choices[0].delta.content:
-                        yield chunk.choices[0].delta.content
-            except Exception as e:
-                error_msg = f"Ошибка при анализе: {str(e)}"
-                print(error_msg)
-                yield error_msg
-        
-        return StreamingResponse(generate(), media_type="text/plain")
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Analysis Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    messages = [
+        {"role": "system", "content": "Ты эксперт по анализу продаж и обучению сотрудников. Твоя задача — анализировать ответы сотрудников и выявлять типичные ошибки."},
+        {"role": "user", "content": f"{request.prompt}\n\nДанные для анализа:\n\n" + "\n".join(answers_context)}
+    ]
 
-# Раздаем статику (наш HTML)
+    async def generate():
+        try:
+            stream = await client.chat.completions.create(model=model, messages=messages, stream=True)
+            async for chunk in stream:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+        except Exception as e:
+            yield f"Ошибка при анализе: {str(e)}"
+
+    return StreamingResponse(generate(), media_type="text/plain")
+
+
+# ---------- Static & pages ----------
+
+
+@app.get("/admin")
+def serve_admin():
+    return FileResponse("static/admin.html")
+
+
 app.mount("/", StaticFiles(directory="static", html=True), name="static")

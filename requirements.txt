@@ -3,3 +3,6 @@ uvicorn
 supabase
 python-dotenv
 openai
+sqlalchemy
+psycopg2-binary
+python-multipart

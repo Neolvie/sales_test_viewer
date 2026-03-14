@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Панель управления | Тестирование знаний</title>
+    <link href="/vendor/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/vendor/css/flatpickr.min.css">
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .navbar-brand img { height: 32px; }
+        .compact-table td, .compact-table th { padding: 0.4rem 0.5rem; font-size: 0.875rem; }
+        .compact-table thead th { font-weight: 600; background: #f8f9fa; }
+        .tab-pane { padding-top: 1rem; }
+        .filter-row { margin-bottom: 0.75rem; }
+        .filter-row .form-control, .filter-row .form-select { font-size: 0.875rem; }
+        .pagination { font-size: 0.875rem; }
+        .badge-score { min-width: 1.8rem; text-align: center; }
+        .score-1 { background-color: #dc3545 !important; }
+        .score-2 { background-color: #fd7e14 !important; }
+        .score-3 { background-color: #e6a817 !important; color: #fff !important; }
+        .score-4 { background-color: #5baa5b !important; }
+        .score-5 { background-color: #198754 !important; }
+        .btn-view-text { padding: 0.1rem 0.4rem; font-size: 0.75rem; }
+    </style>
+    <style>
+        body.admin-logged-in #loginScreen { display: none !important; }
+        body:not(.admin-logged-in) #adminScreen { display: none !important; }
+    </style>
+</head>
+<body>
+    <div id="loginScreen" class="min-vh-100 d-flex align-items-center justify-content-center bg-light">
+        <div class="card card-directum shadow-sm" style="width: 100%; max-width: 360px;">
+            <div class="card-body p-4">
+                <div class="text-center mb-3">
+                    <img src="/img/directum_logo.png" alt="Directum" style="height: 40px;">
+                    <h5 class="mt-2 mb-0">Вход в админку</h5>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Пароль</label>
+                    <input type="password" id="adminPassword" class="form-control form-control-sm" placeholder="Пароль">
+                </div>
+                <button type="button" id="btnLogin" class="btn btn-directum w-100">Войти</button>
+                <p id="loginError" class="text-danger small mt-2 mb-0" style="display: none;"></p>
+            </div>
+        </div>
+    </div>
+
+    <div id="adminScreen">
+        <nav class="navbar navbar-expand navbar-light bg-white border-bottom directum-header">
+            <div class="container-fluid">
+                <a class="navbar-brand d-flex align-items-center gap-2" href="/admin">
+                    <img src="/img/directum_logo.png" alt="Directum">
+                    <span class="title">Панель управления — Тестирование знаний</span>
+                </a>
+                <a href="/" class="btn btn-sm btn-outline-secondary">К тестированию</a>
+            </div>
+        </nav>
+
+        <div class="container-fluid py-3">
+            <ul class="nav nav-tabs nav-tabs-sm" id="adminTabs">
+                <li class="nav-item"><a class="nav-link" data-tab="results" href="#">Результаты</a></li>
+                <li class="nav-item"><a class="nav-link" data-tab="themes" href="#">Темы</a></li>
+                <li class="nav-item"><a class="nav-link" data-tab="prompts" href="#">Промты</a></li>
+            </ul>
+
+            <div id="tabResults" class="tab-pane">
+                <div class="filter-row row g-2 align-items-end">
+                    <div class="col-auto"><label class="form-label small mb-0">ФИО</label><input type="text" id="filterName" class="form-control form-control-sm" placeholder="ФИО" style="width: 160px;"></div>
+                    <div class="col-auto"><label class="form-label small mb-0">Тема</label><select id="filterTheme" class="form-select form-select-sm" style="width: 200px;"></select></div>
+                    <div class="col-auto"><label class="form-label small mb-0">Оценка</label><select id="filterScore" class="form-select form-select-sm" style="width: 80px;"><option value="">—</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select></div>
+                    <div class="col-auto"><label class="form-label small mb-0">Дата от</label><input type="text" id="filterDateFrom" class="form-control form-control-sm" placeholder="дд.мм.гггг" style="width: 130px;" readonly></div>
+                    <div class="col-auto"><label class="form-label small mb-0">Дата до</label><input type="text" id="filterDateTo" class="form-control form-control-sm" placeholder="дд.мм.гггг" style="width: 130px;" readonly></div>
+                    <div class="col-auto align-self-end"><button type="button" id="btnFilter" class="btn btn-sm btn-directum">Применить</button></div>
+                    <div class="col-auto align-self-end ms-auto">
+                        <button type="button" id="btnShowAnalyze" class="btn btn-sm btn-outline-primary" disabled title="Выберите строки в таблице">
+                            Анализировать выбранные <span id="selectedCount" class="badge bg-primary ms-1" style="display:none;"></span>
+                        </button>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover compact-table">
+                        <thead><tr><th><input type="checkbox" id="selectAllResults"></th><th>ID</th><th>Дата</th><th>Сотрудник</th><th>Тема</th><th>Оценка</th><th>Результат</th><th>Ответ</th></tr></thead>
+                        <tbody id="resultsBody"></tbody>
+                    </table>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-2 mb-3">
+                    <span id="resultsSummary" class="small text-muted"></span>
+                    <nav><ul class="pagination pagination-sm mb-0" id="resultsPagination"></ul></nav>
+                </div>
+
+                <!-- Панель анализа -->
+                <div id="analyzePanel" class="border rounded p-3 bg-white mt-3" style="display:none;">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <span class="fw-semibold small">Анализ ответов</span>
+                        <button type="button" id="btnClearSelection" class="btn btn-sm btn-outline-secondary ms-auto">Сбросить выбор</button>
+                        <button type="button" id="btnCollapseAnalyze" class="btn btn-sm btn-outline-secondary">Свернуть ↑</button>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small mb-1">Промт для анализа</label>
+                        <textarea id="analysisPrompt" class="form-control form-control-sm" rows="2">проанализируй и обобщи наиболее явные ошибки и дай рекомендации. Игнорируй непоследовательность в названиях — это может быть артефакт распознавания речи.</textarea>
+                    </div>
+                    <div class="d-flex gap-2 align-items-center mb-2">
+                        <button type="button" id="btnAnalyze" class="btn btn-directum btn-sm">Запустить анализ</button>
+                        <span id="analyzeSpinner" style="display:none;">
+                            <span class="spinner-border spinner-border-sm text-primary" role="status"></span>
+                            <span class="small text-muted ms-1">Генерирую анализ…</span>
+                        </span>
+                        <button type="button" id="btnDownloadAnalysis" class="btn btn-outline-secondary btn-sm" style="display:none;">Скачать .md</button>
+                    </div>
+                    <div id="analysisResult" class="p-3 bg-light rounded font-monospace small" style="white-space: pre-wrap; max-height: 450px; overflow-y: auto; display:none;"></div>
+                </div>
+            </div>
+
+            <div id="tabThemes" class="tab-pane" style="display: none;">
+                <button type="button" id="btnAddTheme" class="btn btn-sm btn-directum mb-2">Добавить тему</button>
+                <div class="table-responsive">
+                    <table class="table table-hover compact-table">
+                        <thead><tr><th>ID</th><th>Название</th><th>Доступна</th><th></th></tr></thead>
+                        <tbody id="themesBody"></tbody>
+                    </table>
+                </div>
+                <div id="themeFormModal" class="modal fade" tabindex="-1">
+                  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                    <div class="modal-content">
+                      <div class="modal-header"><h6 class="modal-title">Тема</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                      <div class="modal-body">
+                        <input type="hidden" id="themeId">
+                        <div class="mb-3"><label class="form-label small fw-semibold">Название</label><input type="text" id="themeName" class="form-control form-control-sm"></div>
+                        <div class="mb-3"><label class="form-label small fw-semibold">Эталонный текст ценностного предложения</label><textarea id="themeRefText" class="form-control form-control-sm font-monospace" rows="16" style="resize: vertical; min-height: 200px;"></textarea></div>
+                        <div class="form-check"><input type="checkbox" id="themeActive" class="form-check-input" checked><label class="form-check-label small">Доступна для зачёта</label></div>
+                      </div>
+                      <div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Отмена</button><button type="button" id="btnSaveTheme" class="btn btn-directum btn-sm">Сохранить</button></div>
+                    </div>
+                  </div>
+                </div>
+            </div>
+
+            <div id="tabPrompts" class="tab-pane" style="display: none;">
+                <button type="button" id="btnAddPrompt" class="btn btn-sm btn-directum mb-2">Создать черновик промта</button>
+                <div class="table-responsive">
+                    <table class="table table-hover compact-table">
+                        <thead><tr><th>Версия</th><th>Заметки</th><th>Статус</th><th>Дата</th><th></th></tr></thead>
+                        <tbody id="promptsBody"></tbody>
+                    </table>
+                </div>
+                <div id="promptEditModal" class="modal fade" tabindex="-1">
+                  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                    <div class="modal-content">
+                      <div class="modal-header"><h6 class="modal-title">Редактировать промт</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                      <div class="modal-body">
+                        <input type="hidden" id="promptId">
+                        <div class="mb-2"><label class="form-label small fw-semibold">Содержимое промта</label><p class="text-muted small mb-1">Используйте <code>REFERENCE_TEXT</code> для эталонного текста и <code>USER_ANSWER</code> для ответа сотрудника.</p><textarea id="promptContent" class="form-control font-monospace small" rows="22" style="resize: vertical; min-height: 300px;"></textarea></div>
+                        <div class="mt-2"><label class="form-label small">Заметки</label><input type="text" id="promptNotes" class="form-control form-control-sm"></div>
+                      </div>
+                      <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Закрыть</button>
+                        <button type="button" id="btnSavePrompt" class="btn btn-directum btn-sm">Сохранить</button>
+                        <button type="button" id="btnTestOnSession" class="btn btn-outline-primary btn-sm">Проверить на ответе</button>
+                        <button type="button" id="btnActivatePrompt" class="btn btn-success btn-sm">Сделать активным</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+            </div>
+            <div id="promptTestModal" class="modal fade" tabindex="-1">
+              <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                  <div class="modal-header"><h6 class="modal-title">Проверка на ответе</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                  <div class="modal-body">
+                    <label class="form-label small">Выберите сессию (ID или ФИО)</label>
+                    <select id="testSessionSelect" class="form-select form-select-sm"></select>
+                    <div id="promptTestSpinner" class="mt-3 d-none">
+                        <span class="spinner-border spinner-border-sm text-primary" role="status"></span>
+                        <span class="small text-muted ms-1">Запрашиваю модель…</span>
+                    </div>
+                    <div id="promptTestResult" class="mt-2 p-2 bg-light small font-monospace" style="white-space: pre-wrap; max-height: 300px; overflow-y: auto;"></div>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Закрыть</button>
+                    <button type="button" id="btnRunPromptTest" class="btn btn-directum btn-sm">Запустить</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Модал просмотра полного текста -->
+    <div id="textViewModal" class="modal fade" tabindex="-1">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header py-2"><h6 class="modal-title" id="textViewTitle">Просмотр</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+          <div class="modal-body"><pre id="textViewContent" class="mb-0" style="white-space: pre-wrap; word-break: break-word; font-size: 0.875rem; font-family: 'Segoe UI', sans-serif;"></pre></div>
+          <div class="modal-footer py-2"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Закрыть</button></div>
+        </div>
+      </div>
+    </div>
+
+    <script src="/vendor/js/bootstrap.bundle.min.js"></script>
+    <script src="/vendor/js/flatpickr.min.js"></script>
+    <script src="/vendor/js/flatpickr.ru.js"></script>
+    <script src="/js/admin.js"></script>
+</body>
+</html>
