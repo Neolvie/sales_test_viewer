@@ -16,6 +16,52 @@
         if (cfg.test_timeout_minutes > 0) timeoutMinutes = cfg.test_timeout_minutes;
     }).catch(function () {});
 
+    // ── IndexedDB helpers for pending recording recovery ──────────────────────
+    var DB_NAME = 'salestester_db';
+    var DB_STORE = 'pending_recording';
+    var DB_KEY = 'recording';
+
+    function openDB(cb) {
+        try {
+            var req = indexedDB.open(DB_NAME, 1);
+            req.onupgradeneeded = function (e) {
+                e.target.result.createObjectStore(DB_STORE);
+            };
+            req.onsuccess = function (e) { cb(null, e.target.result); };
+            req.onerror = function (e) { cb(e.target.error); };
+        } catch (e) { cb(e); }
+    }
+
+    function savePendingRecording(data) {
+        openDB(function (err, db) {
+            if (err) return;
+            try {
+                db.transaction(DB_STORE, 'readwrite').objectStore(DB_STORE).put(data, DB_KEY);
+            } catch (e) {}
+        });
+    }
+
+    function loadPendingRecording(cb) {
+        openDB(function (err, db) {
+            if (err) { cb(null); return; }
+            try {
+                var req = db.transaction(DB_STORE, 'readonly').objectStore(DB_STORE).get(DB_KEY);
+                req.onsuccess = function (e) { cb(e.target.result || null); };
+                req.onerror = function () { cb(null); };
+            } catch (e) { cb(null); }
+        });
+    }
+
+    function clearPendingRecording() {
+        openDB(function (err, db) {
+            if (err) return;
+            try {
+                db.transaction(DB_STORE, 'readwrite').objectStore(DB_STORE).delete(DB_KEY);
+            } catch (e) {}
+        });
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     function startSessionTimeout() {
         clearSessionTimeout();
         if (!timeoutMinutes) return;
@@ -75,6 +121,35 @@
     var savedName = localStorage.getItem(LS_KEY_NAME);
     if (savedName) fullNameInput.value = savedName;
 
+    // Проверить незавершённую запись в IndexedDB
+    loadPendingRecording(function (pending) {
+        if (!pending) return;
+        var banner = document.getElementById('recoverBanner');
+        document.getElementById('recoverThemeName').textContent = pending.themeName;
+        document.getElementById('recoverFullName').textContent = pending.fullName;
+        banner.style.display = 'block';
+
+        document.getElementById('btnRecover').onclick = function () {
+            banner.style.display = 'none';
+            fullName = pending.fullName;
+            fullNameInput.value = fullName;
+            localStorage.setItem(LS_KEY_NAME, fullName);
+            selectedThemeId = pending.themeId;
+            selectedThemeName = pending.themeName;
+            selectedThemeNameEl.textContent = 'Тема: ' + pending.themeName;
+            audioChunks = [pending.blob];
+            recordArea.style.display = 'none';
+            submitArea.style.display = 'block';
+            showStep(3);
+            startSessionTimeout();
+        };
+
+        document.getElementById('btnRecoverDismiss').onclick = function () {
+            banner.style.display = 'none';
+            clearPendingRecording();
+        };
+    });
+
     function showStep(step) {
         step1.style.display = step === 1 ? 'block' : 'none';
         step2.style.display = step === 2 ? 'block' : 'none';
@@ -131,6 +206,7 @@
 
     function resetRecording() {
         audioChunks = [];
+        clearPendingRecording();
         recordArea.style.display = 'block';
         submitArea.style.display = 'none';
         recordStatus.textContent = '';
@@ -141,6 +217,11 @@
     document.getElementById('btnRecord').onclick = function () {
         var btn = this;
         if (mediaRecorder && mediaRecorder.state === 'recording') {
+            // Disable immediately to prevent double-click race condition:
+            // after stop(), state becomes 'inactive' synchronously but onstop fires
+            // asynchronously — a second click would fall through to getUserMedia()
+            // and clear audioChunks right before onstop shows the submit button.
+            btn.disabled = true;
             mediaRecorder.stop();
             return;
         }
@@ -164,6 +245,13 @@
                     if (audioChunks.length) {
                         recordArea.style.display = 'none';
                         submitArea.style.display = 'block';
+                        savePendingRecording({
+                            themeId: selectedThemeId,
+                            themeName: selectedThemeName,
+                            fullName: fullName,
+                            blob: new Blob(audioChunks, { type: 'audio/webm' }),
+                            savedAt: Date.now()
+                        });
                     }
                     recordStatus.textContent = '';
                     btn.textContent = '🎤 Нажать и говорить';
@@ -179,7 +267,10 @@
             });
     };
 
-    document.getElementById('btnRerecord').onclick = resetRecording;
+    document.getElementById('btnRerecord').onclick = function () {
+        clearPendingRecording();
+        resetRecording();
+    };
 
     document.getElementById('btnSubmit').onclick = function () {
         if (!audioChunks.length) return;
@@ -207,6 +298,7 @@
                 return r.json();
             })
             .then(function (data) {
+                clearPendingRecording();
                 resultContent.textContent = data.result || '';
                 if (data.score != null) {
                     resultScore.textContent = 'Итоговая оценка: ' + data.score;

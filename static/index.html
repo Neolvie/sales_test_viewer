@@ -18,6 +18,13 @@
     </header>
 
     <main class="page-container">
+        <div id="recoverBanner" class="card-directum" style="padding: 16px 24px; margin-bottom: 16px; display: none; border-left: 4px solid #005eb8;">
+            <p style="margin: 0 0 8px; font-weight: 600;">Незавершённая попытка</p>
+            <p style="margin: 0 0 12px; font-size: 0.9rem; color: #444;">Найдена несохранённая запись: <strong id="recoverThemeName"></strong> (<span id="recoverFullName"></span>). Хотите продолжить отправку?</p>
+            <button type="button" id="btnRecover" class="btn-directum" style="padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-right: 8px;">Продолжить</button>
+            <button type="button" id="btnRecoverDismiss" style="padding: 8px 16px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">Отклонить</button>
+        </div>
+
         <div id="step1" class="card-directum" style="padding: 24px; margin-bottom: 16px;">
             <h2 style="margin: 0 0 16px; font-size: 1.25rem;">Шаг 1. Ваше ФИО</h2>
             <input type="text" id="fullName" placeholder="Иванов Иван Иванович" maxlength="500">
