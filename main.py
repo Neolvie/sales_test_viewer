@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse, StreamingResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, and_, or_, func as sql_func
+from sqlalchemy import desc, asc, and_, or_, func as sql_func
 
 from database import get_engine, SessionLocal, Theme, Prompt, Session as DBSession, PromptTest
 from services import (
@@ -154,6 +154,8 @@ def admin_list_sessions(
     score: Optional[int] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
+    sort_by: Optional[str] = None,
+    sort_dir: Optional[str] = None,
     _: bool = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
@@ -175,8 +177,24 @@ def admin_list_sessions(
         except ValueError:
             pass
 
+    if sort_by == 'theme_name':
+        q = q.join(Theme, DBSession.theme_id == Theme.id)
+
     total = q.count()
-    q = q.order_by(desc(DBSession.created_at)).offset((page - 1) * limit).limit(limit)
+
+    order_dir_fn = asc if sort_dir == 'asc' else desc
+    if sort_by == 'id':
+        q = q.order_by(order_dir_fn(DBSession.id))
+    elif sort_by == 'full_name':
+        q = q.order_by(order_dir_fn(DBSession.full_name))
+    elif sort_by == 'theme_name':
+        q = q.order_by(order_dir_fn(Theme.name))
+    elif sort_by == 'created_at':
+        q = q.order_by(order_dir_fn(DBSession.created_at))
+    else:
+        q = q.order_by(desc(DBSession.created_at))
+
+    q = q.offset((page - 1) * limit).limit(limit)
     rows = q.all()
 
     theme_ids = {r.theme_id for r in rows}

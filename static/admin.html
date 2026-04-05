@@ -22,6 +22,10 @@
         .score-4 { background-color: #5baa5b !important; }
         .score-5 { background-color: #198754 !important; }
         .btn-view-text { padding: 0.1rem 0.4rem; font-size: 0.75rem; }
+        .sortable-col { cursor: pointer; user-select: none; white-space: nowrap; }
+        .sortable-col:hover { background: #e9ecef; }
+        .sort-icon { font-size: 0.7rem; margin-left: 3px; opacity: 0.4; }
+        .sort-icon.active { opacity: 1; }
     </style>
     <style>
         body.admin-logged-in #loginScreen { display: none !important; }
@@ -80,7 +84,7 @@
                 </div>
                 <div class="table-responsive">
                     <table class="table table-hover compact-table">
-                        <thead><tr><th><input type="checkbox" id="selectAllResults"></th><th>ID</th><th>Дата</th><th>Сотрудник</th><th>Тема</th><th>Оценка</th><th>Результат</th><th>Ответ</th></tr></thead>
+                        <thead><tr><th><input type="checkbox" id="selectAllResults"></th><th class="sortable-col" id="thSortId">ID <span class="sort-icon" id="sortIconId">↕</span></th><th class="sortable-col" id="thSortDate">Дата <span class="sort-icon active" id="sortIconDate">↓</span></th><th class="sortable-col" id="thSortName">Сотрудник <span class="sort-icon" id="sortIconName">↕</span></th><th class="sortable-col" id="thSortTheme">Тема <span class="sort-icon" id="sortIconTheme">↕</span></th><th>Оценка</th><th>Результат</th><th>Ответ</th></tr></thead>
                         <tbody id="resultsBody"></tbody>
                     </table>
                 </div>

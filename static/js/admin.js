@@ -6,6 +6,7 @@
     var allThemes = [];
     var selectedSessions = new Map();
     var sessionsCache = [];
+    var currentSort = { by: 'created_at', dir: 'desc' };
 
     function getAuthHeader() {
         var t = sessionStorage.getItem(ADMIN_STORAGE_KEY);
@@ -114,6 +115,38 @@
     });
     document.querySelector('#adminTabs .nav-link[data-tab="results"]').classList.add('active');
 
+    // --- Sorting ---
+    function updateSortIcons() {
+        var icons = { id: 'sortIconId', created_at: 'sortIconDate', full_name: 'sortIconName', theme_name: 'sortIconTheme' };
+        Object.keys(icons).forEach(function (col) {
+            var el = document.getElementById(icons[col]);
+            if (!el) return;
+            if (currentSort.by === col) {
+                el.textContent = currentSort.dir === 'asc' ? '↑' : '↓';
+                el.classList.add('active');
+            } else {
+                el.textContent = '↕';
+                el.classList.remove('active');
+            }
+        });
+    }
+
+    function setSortColumn(col) {
+        if (currentSort.by === col) {
+            currentSort.dir = currentSort.dir === 'asc' ? 'desc' : 'asc';
+        } else {
+            currentSort.by = col;
+            currentSort.dir = 'asc';
+        }
+        updateSortIcons();
+        loadResults(1);
+    }
+
+    document.getElementById('thSortId').onclick = function () { setSortColumn('id'); };
+    document.getElementById('thSortDate').onclick = function () { setSortColumn('created_at'); };
+    document.getElementById('thSortName').onclick = function () { setSortColumn('full_name'); };
+    document.getElementById('thSortTheme').onclick = function () { setSortColumn('theme_name'); };
+
     // --- Results (server-side pagination + filters) ---
     function buildResultsQuery(page) {
         var q = ['page=' + page, 'limit=' + pageSize];
@@ -127,6 +160,7 @@
         if (dateFrom) q.push('date_from=' + dateFrom);
         var dateTo = fpValueToApi(document.getElementById('filterDateTo').value);
         if (dateTo) q.push('date_to=' + dateTo);
+        if (currentSort.by) q.push('sort_by=' + currentSort.by + '&sort_dir=' + currentSort.dir);
         return '/api/admin/sessions?' + q.join('&');
     }
 
