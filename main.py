@@ -219,6 +219,108 @@ def admin_list_sessions(
     return {"data": data, "total": total, "page": page, "limit": limit}
 
 
+@app.get("/api/admin/sessions/export")
+def admin_export_sessions(
+    name: Optional[str] = None,
+    theme_id: Optional[int] = None,
+    score: Optional[int] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    sort_by: Optional[str] = None,
+    sort_dir: Optional[str] = None,
+    _: bool = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Выгрузка результатов зачётов в Excel. Применяются те же фильтры, что и в
+    списке (без пагинации): дата, ФИО, тема, оценка."""
+    q = db.query(DBSession).filter(DBSession.state == 1)
+    if name and name.strip():
+        q = q.filter(DBSession.full_name.ilike(f"%{name.strip()}%"))
+    if theme_id is not None:
+        q = q.filter(DBSession.theme_id == theme_id)
+    if score is not None:
+        q = q.filter(DBSession.score == score)
+    if date_from:
+        q = q.filter(DBSession.created_at >= date_from)
+    if date_to:
+        from datetime import date as _date, timedelta as _td
+        try:
+            dt_to_exclusive = (_date.fromisoformat(date_to) + _td(days=1)).isoformat()
+            q = q.filter(DBSession.created_at < dt_to_exclusive)
+        except ValueError:
+            pass
+
+    if sort_by == 'theme_name':
+        q = q.join(Theme, DBSession.theme_id == Theme.id)
+
+    order_dir_fn = asc if sort_dir == 'asc' else desc
+    if sort_by == 'id':
+        q = q.order_by(order_dir_fn(DBSession.id))
+    elif sort_by == 'full_name':
+        q = q.order_by(order_dir_fn(DBSession.full_name))
+    elif sort_by == 'theme_name':
+        q = q.order_by(order_dir_fn(Theme.name))
+    elif sort_by == 'created_at':
+        q = q.order_by(order_dir_fn(DBSession.created_at))
+    else:
+        q = q.order_by(desc(DBSession.created_at))
+
+    rows = q.all()
+
+    theme_ids = {r.theme_id for r in rows}
+    themes_map = {}
+    if theme_ids:
+        for t in db.query(Theme).filter(Theme.id.in_(theme_ids)).all():
+            themes_map[t.id] = t.name
+
+    import io
+    from datetime import datetime, timezone, timedelta
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Зачёты"
+
+    headers = ["Дата", "ФИО", "Тема", "Оценка"]
+    ws.append(headers)
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(horizontal="center")
+
+    # Локальное время МСК (UTC+3) для отображения даты
+    msk = timezone(timedelta(hours=3))
+    for r in rows:
+        if r.created_at:
+            dt = r.created_at
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            date_str = dt.astimezone(msk).strftime("%d.%m.%Y %H:%M")
+        else:
+            date_str = ""
+        ws.append([
+            date_str,
+            r.full_name or "",
+            themes_map.get(r.theme_id, "—"),
+            r.score if r.score is not None else "",
+        ])
+
+    widths = [18, 30, 40, 8]
+    for i, w in enumerate(widths, 1):
+        ws.column_dimensions[chr(64 + i)].width = w
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    fname = "zachety_" + datetime.now().strftime("%Y%m%d_%H%M") + ".xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
 @app.get("/api/admin/themes")
 def admin_list_themes(_: bool = Depends(require_admin), db: Session = Depends(get_db)):
     rows = db.query(Theme).order_by(Theme.name).all()

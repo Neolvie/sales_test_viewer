@@ -269,6 +269,50 @@
     }
 
     document.getElementById('btnFilter').onclick = function () { loadResults(1); };
+
+    // --- Export to Excel (same filters, no pagination) ---
+    function buildExportQuery() {
+        var q = [];
+        var name = document.getElementById('filterName').value;
+        if (name) q.push('name=' + encodeURIComponent(name));
+        var themeId = document.getElementById('filterTheme').value;
+        if (themeId) q.push('theme_id=' + themeId);
+        var score = document.getElementById('filterScore').value;
+        if (score) q.push('score=' + score);
+        var dateFrom = fpValueToApi(document.getElementById('filterDateFrom').value);
+        if (dateFrom) q.push('date_from=' + dateFrom);
+        var dateTo = fpValueToApi(document.getElementById('filterDateTo').value);
+        if (dateTo) q.push('date_to=' + dateTo);
+        if (currentSort.by) q.push('sort_by=' + currentSort.by + '&sort_dir=' + currentSort.dir);
+        return '/api/admin/sessions/export' + (q.length ? '?' + q.join('&') : '');
+    }
+
+    document.getElementById('btnExportExcel').onclick = function () {
+        var btn = this;
+        btn.disabled = true;
+        api(buildExportQuery())
+            .then(function (r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                var fname = 'zachety.xlsx';
+                var cd = r.headers.get('Content-Disposition') || '';
+                var m = cd.match(/filename="?([^"]+)"?/);
+                if (m) fname = m[1];
+                return r.blob().then(function (blob) { return { blob: blob, fname: fname }; });
+            })
+            .then(function (res) {
+                var url = URL.createObjectURL(res.blob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = res.fname;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            })
+            .catch(function (e) { alert('Ошибка выгрузки: ' + (e.message || '')); })
+            .finally(function () { btn.disabled = false; });
+    };
+
     document.getElementById('selectAllResults').onchange = function () {
         var checked = this.checked;
         sessionsCache.forEach(function (r) {
