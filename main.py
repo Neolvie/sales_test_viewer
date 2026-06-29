@@ -1,11 +1,18 @@
 import os
 import time
+import logging
 import threading
 from collections import defaultdict
 from typing import List, Optional
 
 from dotenv import load_dotenv
 load_dotenv()
+
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+)
+log = logging.getLogger("salestester")
 
 from fastapi import FastAPI, Depends, HTTPException, Header, Request, UploadFile, File, Form
 from fastapi.responses import FileResponse, StreamingResponse, HTMLResponse
@@ -532,9 +539,14 @@ async def admin_analyze(request: AnalysisRequest, _: bool = Depends(require_admi
     if not request.selected_answers:
         raise HTTPException(status_code=400, detail="Нет выбранных ответов для анализа")
 
-    from services import get_llm_client_async, LLM_MODEL
+    from services import get_llm_client_async, LLM_MODEL, OPENROUTER_BASE_URL
     client = get_llm_client_async()
     model = LLM_MODEL
+
+    log.info(
+        "ANALYZE start: model=%s base_url=%s answers=%d prompt_len=%d",
+        model, OPENROUTER_BASE_URL, len(request.selected_answers), len(request.prompt),
+    )
 
     answers_context = []
     for idx, answer in enumerate(request.selected_answers, 1):
@@ -551,14 +563,25 @@ async def admin_analyze(request: AnalysisRequest, _: bool = Depends(require_admi
         {"role": "user", "content": f"{request.prompt}\n\nДанные для анализа:\n\n" + "\n".join(answers_context)}
     ]
 
+    total_chars = sum(len(m["content"]) for m in messages)
+    log.info("ANALYZE request: total_input_chars=%d", total_chars)
+
     async def generate():
+        t0 = time.time()
+        chars = 0
         try:
-            stream = await client.chat.completions.create(model=model, messages=messages, stream=True)
+            stream = await client.chat.completions.create(
+                model=model, messages=messages, stream=True, timeout=120,
+            )
+            log.info("ANALYZE stream opened in %.1fs", time.time() - t0)
             async for chunk in stream:
                 if chunk.choices and chunk.choices[0].delta.content:
+                    chars += len(chunk.choices[0].delta.content)
                     yield chunk.choices[0].delta.content
+            log.info("ANALYZE done: %d chars in %.1fs", chars, time.time() - t0)
         except Exception as e:
-            yield f"Ошибка при анализе: {str(e)}"
+            log.exception("ANALYZE failed after %.1fs: %s", time.time() - t0, e)
+            yield f"Ошибка при анализе: {type(e).__name__}: {str(e)}"
 
     return StreamingResponse(generate(), media_type="text/plain")
 

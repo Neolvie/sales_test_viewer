@@ -1,7 +1,11 @@
 import os
 import re
+import time
+import logging
 from typing import Optional
 from openai import AsyncOpenAI, OpenAI
+
+log = logging.getLogger("salestester.services")
 
 # Whisper (распознавание голоса) — OpenAI
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -112,11 +116,20 @@ async def evaluate_answer_async(reference_text: str, user_answer: str, prompt_co
     """Run LLM evaluation of user answer against reference. Uses prompt_content with REFERENCE_TEXT and USER_ANSWER placeholders."""
     content = prompt_content.replace("REFERENCE_TEXT", reference_text).replace("USER_ANSWER", user_answer)
     client = get_llm_client_async()
-    resp = await client.chat.completions.create(
-        model=LLM_MODEL,
-        messages=[{"role": "user", "content": content}],
-    )
-    return (resp.choices[0].message.content or "").strip()
+    log.info("EVALUATE start: model=%s base_url=%s input_chars=%d", LLM_MODEL, OPENROUTER_BASE_URL, len(content))
+    t0 = time.time()
+    try:
+        resp = await client.chat.completions.create(
+            model=LLM_MODEL,
+            messages=[{"role": "user", "content": content}],
+            timeout=120,
+        )
+    except Exception as e:
+        log.exception("EVALUATE failed after %.1fs: %s", time.time() - t0, e)
+        raise
+    out = (resp.choices[0].message.content or "").strip()
+    log.info("EVALUATE done: %d chars in %.1fs", len(out), time.time() - t0)
+    return out
 
 
 def extract_score_from_result(result_text: str) -> Optional[int]:
