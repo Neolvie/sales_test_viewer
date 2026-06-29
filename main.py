@@ -37,6 +37,10 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
 TEST_TIMEOUT_MINUTES = int(os.getenv("TEST_TIMEOUT_MINUTES", "20"))
 ROOT_PATH = os.getenv("ROOT_PATH", "").rstrip("/")
 
+# Единые логин/пароль для входа на страницу тестирования (один на всех).
+USER_LOGIN = os.getenv("USER_LOGIN", "")
+USER_PASSWORD = os.getenv("USER_PASSWORD", "")
+
 
 def _serve_html(filename: str) -> HTMLResponse:
     """Serve an HTML file with window.BASE_PATH injected."""
@@ -132,11 +136,29 @@ def require_admin(request: Request, authorization: Optional[str] = Header(None))
     return True
 
 
+def require_user(request: Request, authorization: Optional[str] = Header(None)):
+    """Авторизация для страницы тестирования: единые логин/пароль на всех
+    (USER_LOGIN/USER_PASSWORD из .env). Защита от перебора — та же in-memory по IP."""
+    if not USER_LOGIN or not USER_PASSWORD:
+        raise HTTPException(status_code=503, detail="USER_LOGIN/USER_PASSWORD not configured")
+    ip = _client_ip(request)
+    _check_not_locked(ip)
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+    token = authorization[7:].strip()
+    login, sep, password = token.partition(":")
+    if not sep or login != USER_LOGIN or password != USER_PASSWORD:
+        _record_failure(ip)
+        raise HTTPException(status_code=401, detail="Invalid login or password")
+    _record_success(ip)
+    return True
+
+
 # ---------- Public API (seller) ----------
 
 
 @app.get("/api/themes")
-def list_themes(db: Session = Depends(get_db)):
+def list_themes(_: bool = Depends(require_user), db: Session = Depends(get_db)):
     rows = db.query(Theme).filter(Theme.is_active == True).order_by(Theme.name).all()
     return [{"id": t.id, "name": t.name} for t in rows]
 
@@ -146,6 +168,7 @@ async def submit_test(
     full_name: str = Form(...),
     theme_id: int = Form(...),
     audio: UploadFile = File(...),
+    _: bool = Depends(require_user),
     db: Session = Depends(get_db),
 ):
     theme = db.query(Theme).filter(Theme.id == theme_id, Theme.is_active == True).first()

@@ -1,5 +1,6 @@
 (function () {
     var LS_KEY_NAME = 'salestester_full_name';
+    var USER_STORAGE_KEY = 'salestester_user_token';
     var BP = (window.BASE_PATH || '');
     var themes = [];
     var selectedThemeId = null;
@@ -15,6 +16,77 @@
     fetch(BP + '/api/config').then(function (r) { return r.json(); }).then(function (cfg) {
         if (cfg.test_timeout_minutes > 0) timeoutMinutes = cfg.test_timeout_minutes;
     }).catch(function () {});
+
+    // ── Авторизация (единые логин/пароль на всех, задаются в админке) ──────────
+    function getAuthHeader() {
+        var t = sessionStorage.getItem(USER_STORAGE_KEY);
+        return t ? { 'Authorization': 'Bearer ' + t } : {};
+    }
+
+    function showLogin() {
+        document.body.classList.remove('user-logged-in');
+    }
+
+    function showApp() {
+        document.body.classList.add('user-logged-in');
+    }
+
+    // fetch с заголовком авторизации; при 401 разлогинивает и показывает форму входа
+    function authFetch(url, options) {
+        options = options || {};
+        options.headers = Object.assign({}, options.headers || {}, getAuthHeader());
+        return fetch(url, options).then(function (r) {
+            if (r.status === 401) {
+                sessionStorage.removeItem(USER_STORAGE_KEY);
+                showLogin();
+                throw new Error('Не авторизован');
+            }
+            return r;
+        });
+    }
+
+    document.getElementById('btnUserLogin').onclick = function () {
+        var login = document.getElementById('userLogin').value;
+        var pwd = document.getElementById('userPassword').value;
+        var errEl = document.getElementById('userLoginError');
+        errEl.style.display = 'none';
+        if (!login || !pwd) {
+            errEl.textContent = 'Введите логин и пароль';
+            errEl.style.display = 'block';
+            return;
+        }
+        var token = login + ':' + pwd;
+        fetch(BP + '/api/themes', { headers: { 'Authorization': 'Bearer ' + token } })
+            .then(function (r) {
+                if (r.ok) return;
+                return r.json().catch(function () { return {}; }).then(function (body) {
+                    if (r.status === 429) {
+                        throw new Error(body.detail || 'Слишком много попыток входа. Попробуйте позже.');
+                    }
+                    throw new Error('Неверный логин или пароль');
+                });
+            })
+            .then(function () {
+                sessionStorage.setItem(USER_STORAGE_KEY, token);
+                document.getElementById('userLogin').value = '';
+                document.getElementById('userPassword').value = '';
+                showApp();
+            })
+            .catch(function (e) {
+                errEl.textContent = e.message || 'Ошибка входа';
+                errEl.style.display = 'block';
+            });
+    };
+
+    document.getElementById('userPassword').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); document.getElementById('btnUserLogin').click(); }
+    });
+
+    if (sessionStorage.getItem(USER_STORAGE_KEY)) {
+        showApp();
+    } else {
+        showLogin();
+    }
 
     // ── IndexedDB helpers for pending recording recovery ──────────────────────
     var DB_NAME = 'salestester_db';
@@ -169,7 +241,7 @@
 
     function loadThemes() {
         themeList.innerHTML = '<p>Загрузка тем...</p>';
-        fetch(BP + '/api/themes')
+        authFetch(BP + '/api/themes')
             .then(function (r) { return r.json(); })
             .then(function (data) {
                 themes = data;
@@ -286,7 +358,7 @@
         form.append('theme_id', selectedThemeId);
         form.append('audio', blob, 'recording.webm');
 
-        fetch(BP + '/api/test', { method: 'POST', body: form })
+        authFetch(BP + '/api/test', { method: 'POST', body: form })
             .then(function (r) {
                 var ct = r.headers.get('content-type') || '';
                 if (!r.ok) {
