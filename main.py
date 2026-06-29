@@ -42,13 +42,38 @@ USER_LOGIN = os.getenv("USER_LOGIN", "")
 USER_PASSWORD = os.getenv("USER_PASSWORD", "")
 
 
+import re as _re
+
+_ASSET_ATTR_RE = _re.compile(r'(src|href)="([^"]+\.(?:js|css))"')
+
+
+def _bust_cache(content: str) -> str:
+    """Дописывает ?v=<mtime> к ссылкам на локальные js/css, чтобы браузер сам
+    подтягивал свежую версию после изменения файла (без Ctrl+Shift+R)."""
+    def repl(m):
+        attr, url = m.group(1), m.group(2)
+        # пропускаем внешние и абсолютные ссылки и уже версионированные
+        if url.startswith(("http://", "https://", "//", "/")) or "?" in url:
+            return m.group(0)
+        path = os.path.join("static", url)
+        try:
+            ver = int(os.path.getmtime(path))
+        except OSError:
+            return m.group(0)
+        return f'{attr}="{url}?v={ver}"'
+
+    return _ASSET_ATTR_RE.sub(repl, content)
+
+
 def _serve_html(filename: str) -> HTMLResponse:
     """Serve an HTML file with window.BASE_PATH injected."""
     with open(f"static/{filename}", "r", encoding="utf-8") as f:
         content = f.read()
     script = f'<script>window.BASE_PATH="{ROOT_PATH}";</script>'
     content = content.replace("</head>", script + "\n</head>", 1)
-    return HTMLResponse(content)
+    content = _bust_cache(content)
+    # сам HTML не кэшируем, чтобы новые ?v= всегда доходили до браузера
+    return HTMLResponse(content, headers={"Cache-Control": "no-cache, must-revalidate"})
 
 
 @app.get("/api/config")
