@@ -1,10 +1,13 @@
 import os
+import time
+import threading
+from collections import defaultdict
 from typing import List, Optional
 
 from dotenv import load_dotenv
 load_dotenv()
 
-from fastapi import FastAPI, Depends, HTTPException, Header, UploadFile, File, Form
+from fastapi import FastAPI, Depends, HTTPException, Header, Request, UploadFile, File, Form
 from fastapi.responses import FileResponse, StreamingResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -67,15 +70,58 @@ def get_db():
         db.close()
 
 
-def require_admin(authorization: Optional[str] = Header(None)):
+# ---------- Простая защита от перебора паролей (in-memory, по IP) ----------
+MAX_FAILED_ATTEMPTS = 5          # сколько неудачных попыток разрешено
+LOCKOUT_SECONDS = 5 * 60         # на сколько блокируем IP после превышения
+_failed_attempts = defaultdict(list)  # ip -> список timestamp'ов неудачных попыток
+_attempts_lock = threading.Lock()
+
+
+def _client_ip(request: Request) -> str:
+    # За nginx реальный адрес приходит в X-Forwarded-For
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+def _check_not_locked(ip: str):
+    now = time.time()
+    with _attempts_lock:
+        attempts = [t for t in _failed_attempts.get(ip, []) if now - t < LOCKOUT_SECONDS]
+        _failed_attempts[ip] = attempts
+        if len(attempts) >= MAX_FAILED_ATTEMPTS:
+            retry = int(LOCKOUT_SECONDS - (now - attempts[0])) + 1
+            raise HTTPException(
+                status_code=429,
+                detail=f"Слишком много попыток входа. Попробуйте через {retry} сек.",
+                headers={"Retry-After": str(retry)},
+            )
+
+
+def _record_failure(ip: str):
+    with _attempts_lock:
+        _failed_attempts[ip].append(time.time())
+
+
+def _record_success(ip: str):
+    with _attempts_lock:
+        _failed_attempts.pop(ip, None)
+
+
+def require_admin(request: Request, authorization: Optional[str] = Header(None)):
     if not ADMIN_LOGIN or not ADMIN_PASSWORD:
         raise HTTPException(status_code=503, detail="ADMIN_LOGIN/ADMIN_PASSWORD not configured")
+    ip = _client_ip(request)
+    _check_not_locked(ip)
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
     token = authorization[7:].strip()
     login, sep, password = token.partition(":")
     if not sep or login != ADMIN_LOGIN or password != ADMIN_PASSWORD:
+        _record_failure(ip)
         raise HTTPException(status_code=401, detail="Invalid login or password")
+    _record_success(ip)
     return True
 
 

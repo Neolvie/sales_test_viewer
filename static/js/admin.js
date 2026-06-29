@@ -41,9 +41,17 @@
             return;
         }
         var token = login + ':' + pwd;
-        api('/api/admin/sessions?page=1&limit=1', { headers: { 'Authorization': 'Bearer ' + token } })
+        fetch((window.BASE_PATH || '') + '/api/admin/sessions?page=1&limit=1', { headers: { 'Authorization': 'Bearer ' + token } })
             .then(function (r) {
-                if (!r.ok) throw new Error('Неверный логин или пароль');
+                if (r.ok) return;
+                return r.json().catch(function () { return {}; }).then(function (body) {
+                    if (r.status === 429) {
+                        throw new Error(body.detail || 'Слишком много попыток входа. Попробуйте позже.');
+                    }
+                    throw new Error('Неверный логин или пароль');
+                });
+            })
+            .then(function () {
                 sessionStorage.setItem(ADMIN_STORAGE_KEY, token);
                 document.body.classList.add('admin-logged-in');
                 document.getElementById('adminLogin').value = '';
