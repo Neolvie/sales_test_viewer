@@ -22,6 +22,7 @@ from services import (
 
 app = FastAPI()
 
+ADMIN_LOGIN = os.getenv("ADMIN_LOGIN", "")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
 TEST_TIMEOUT_MINUTES = int(os.getenv("TEST_TIMEOUT_MINUTES", "20"))
 ROOT_PATH = os.getenv("ROOT_PATH", "").rstrip("/")
@@ -67,13 +68,14 @@ def get_db():
 
 
 def require_admin(authorization: Optional[str] = Header(None)):
-    if not ADMIN_PASSWORD:
-        raise HTTPException(status_code=503, detail="ADMIN_PASSWORD not configured")
+    if not ADMIN_LOGIN or not ADMIN_PASSWORD:
+        raise HTTPException(status_code=503, detail="ADMIN_LOGIN/ADMIN_PASSWORD not configured")
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
     token = authorization[7:].strip()
-    if token != ADMIN_PASSWORD:
-        raise HTTPException(status_code=401, detail="Invalid password")
+    login, sep, password = token.partition(":")
+    if not sep or login != ADMIN_LOGIN or password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Invalid login or password")
     return True
 
 

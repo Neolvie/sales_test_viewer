@@ -31,19 +31,22 @@
 
     // --- Login ---
     document.getElementById('btnLogin').onclick = function () {
+        var login = document.getElementById('adminLogin').value;
         var pwd = document.getElementById('adminPassword').value;
         var errEl = document.getElementById('loginError');
         errEl.style.display = 'none';
-        if (!pwd) {
-            errEl.textContent = 'Введите пароль';
+        if (!login || !pwd) {
+            errEl.textContent = 'Введите логин и пароль';
             errEl.style.display = 'block';
             return;
         }
-        api('/api/admin/sessions?page=1&limit=1', { headers: { 'Authorization': 'Bearer ' + pwd } })
+        var token = login + ':' + pwd;
+        api('/api/admin/sessions?page=1&limit=1', { headers: { 'Authorization': 'Bearer ' + token } })
             .then(function (r) {
-                if (!r.ok) throw new Error('Неверный пароль');
-                sessionStorage.setItem(ADMIN_STORAGE_KEY, pwd);
+                if (!r.ok) throw new Error('Неверный логин или пароль');
+                sessionStorage.setItem(ADMIN_STORAGE_KEY, token);
                 document.body.classList.add('admin-logged-in');
+                document.getElementById('adminLogin').value = '';
                 document.getElementById('adminPassword').value = '';
                 loadResults(1);
                 loadThemesForFilter();
